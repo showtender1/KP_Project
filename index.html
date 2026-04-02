@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Three.js FPS</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+  <div id="ui">
+    <button id="firstView">1인칭 시점</button>
+    <button id="freeView">자유 시점</button>
+  </div>
+
+  <div id="crosshair">+</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
