@@ -2,10 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-// 🌟 EXR 로더 추가
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'; 
 
-// ===== 기본 세팅 =====
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
@@ -18,18 +16,18 @@ const camera = new THREE.PerspectiveCamera(
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-// 🌟 HDR 톤 매핑 설정 (빛을 영화처럼 자연스럽게)
+// HDR 톤 매핑 설정 
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0; // 밝기 (필요시 조절)
 document.body.appendChild(renderer.domElement);
 
-// ===== 조명 =====
+// 조명
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(5, 10, 5);
 scene.add(light);
 
-// ===== 🌅 360도 EXR 배경 로드 =====
+// 360도 EXR 배경 로드
 const exrLoader = new EXRLoader();
 exrLoader.load('/textures/sky.exr', (texture) => { // 👈 본인 EXR 파일 경로에 맞추세요
   texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -37,27 +35,27 @@ exrLoader.load('/textures/sky.exr', (texture) => { // 👈 본인 EXR 파일 경
   scene.environment = texture; // 창문에 하늘이 반사됨!
 });
 
-// ===== 컨트롤 설정 =====
+// 컨트롤 설정 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = true;
 
 const fps = new PointerLockControls(camera, document.body);
 scene.add(fps.getObject());
 
-// ⬆️ 시점 높이 설정 (원하는 만큼 수정 가능)
+// 시점 높이 설정
 const FIXED_Y = 2.8; 
 fps.getObject().position.set(-5, FIXED_Y, 10); 
 
-// ===== 상호작용 및 물리 변수 =====
+// 상호작용 및 물리 변수
 const raycaster = new THREE.Raycaster();
 const centerPosition = new THREE.Vector2(0, 0); 
 const interactableDoors = []; 
 
-// 🧱 벽 충돌 방지용
+// 벽 충돌 방지용
 const collisionRaycaster = new THREE.Raycaster();
 const mapObjects = []; 
 
-// ===== 모델 로드 =====
+// 모델 로드
 const gltfLoader = new GLTFLoader();
 
 // 교실 모델
