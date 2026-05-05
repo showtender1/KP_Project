@@ -75,6 +75,7 @@ gltfLoader.load(assetUrl('models/door1.glb'), (gltf) => {
   const door1 = gltf.scene;
   door1.position.set(6.38, 0.99, 1.13);
   door1.userData.isOpen = false;
+  door1.userData.openRotationY = -Math.PI / 2;
   door1.userData.targetRotation = 0; 
   interactableDoors.push(door1);
   scene.add(door1);
@@ -150,7 +151,8 @@ window.addEventListener('mousedown', (e) => {
 
     if (clickedDoor.userData.hasOwnProperty('isOpen')) {
       clickedDoor.userData.isOpen = !clickedDoor.userData.isOpen;
-      clickedDoor.userData.targetRotation = clickedDoor.userData.isOpen ? Math.PI / 2 : 0;
+      const openAngle = clickedDoor.userData.openRotationY ?? Math.PI / 2;
+      clickedDoor.userData.targetRotation = clickedDoor.userData.isOpen ? openAngle : 0;
     }
   }
 });
