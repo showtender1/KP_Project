@@ -2,7 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { EXRLoader } from 'three/addons/loaders/EXRLoader.js'; 
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+
+/** GitHub Pages 등 서브경로(/repo/) 배포 시 올바른 URL (루트 절대경로 `/models` 방지) */
+function assetUrl(relativePath) {
+  return new URL(relativePath, import.meta.url).href;
+}
 
 const scene = new THREE.Scene();
 
@@ -29,7 +34,7 @@ scene.add(light);
 
 // 360도 EXR 배경 로드
 const exrLoader = new EXRLoader();
-exrLoader.load('/textures/sky.exr', (texture) => { // 👈 본인 EXR 파일 경로에 맞추세요
+exrLoader.load(assetUrl('textures/sky.exr'), (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.background = texture;
   scene.environment = texture; // 창문에 하늘이 반사됨!
@@ -59,14 +64,14 @@ const mapObjects = [];
 const gltfLoader = new GLTFLoader();
 
 // 교실 모델
-gltfLoader.load('/models/classroom.glb', (gltf) => {
+gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
   mapObjects.push(gltf.scene); 
   scene.add(gltf.scene);
 });
 
 
 // 첫 번째 문 모델
-gltfLoader.load('/models/door1.glb', (gltf) => {
+gltfLoader.load(assetUrl('models/door1.glb'), (gltf) => {
   const door1 = gltf.scene;
   door1.position.set(6.38, 0.99, 1.13);
   door1.userData.isOpen = false;
@@ -76,7 +81,7 @@ gltfLoader.load('/models/door1.glb', (gltf) => {
 });
 
 // 두 번째 문 모델
-gltfLoader.load('/models/door2.glb', (gltf) => {
+gltfLoader.load(assetUrl('models/door2.glb'), (gltf) => {
   const door2 = gltf.scene;
   door2.position.set(4.66, 0.96, 3.75
   ); 
@@ -87,7 +92,7 @@ gltfLoader.load('/models/door2.glb', (gltf) => {
 });
 
 // 세 번째 문 모델
-gltfLoader.load('/models/door3.glb', (gltf) => {
+gltfLoader.load(assetUrl('models/door3.glb'), (gltf) => {
   const door3 = gltf.scene;
   door3.position.set(0.7, 1.02, 3.75);
   door3.userData.isOpen = false;
