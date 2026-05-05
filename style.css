@@ -16,7 +16,23 @@ body {
     padding: 10px;
   }
   
-  /* 🎯 십자선 스타일 */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+  }
+
+  #loading-text {
+    color: #fff;
+    font-size: 20px;
+    font-family: sans-serif;
+  }
+
+  /* 십자선 스타일 */
   #crosshair {
     position: absolute;
     top: 50%;

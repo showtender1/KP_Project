@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
@@ -61,7 +62,20 @@ const collisionRaycaster = new THREE.Raycaster();
 const mapObjects = []; 
 
 // 모델 로드
-const gltfLoader = new GLTFLoader();
+const loadingEl = document.getElementById('loading');
+const loadingText = document.getElementById('loading-text');
+const loadingManager = new THREE.LoadingManager();
+loadingManager.onProgress = (_url, loaded, total) => {
+  loadingText.textContent = `로딩 중... ${Math.round(loaded / total * 100)}%`;
+};
+loadingManager.onLoad = () => {
+  loadingEl.style.display = 'none';
+};
+
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/libs/draco/');
+const gltfLoader = new GLTFLoader(loadingManager);
+gltfLoader.setDRACOLoader(dracoLoader);
 
 // 교실 모델
 gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
