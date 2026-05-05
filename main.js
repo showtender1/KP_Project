@@ -43,7 +43,7 @@ const fps = new PointerLockControls(camera, document.body);
 scene.add(fps.getObject());
 
 // 시점 높이 설정
-const FIXED_Y = 2.8; 
+const FIXED_Y = 1.7; 
 fps.getObject().position.set(-5, FIXED_Y, 10); 
 
 // 상호작용 및 물리 변수
@@ -64,16 +64,11 @@ gltfLoader.load('/models/classroom.glb', (gltf) => {
   scene.add(gltf.scene);
 });
 
-// 복도 모델
-gltfLoader.load('/models/corridor.glb', (gltf) => {
-  mapObjects.push(gltf.scene); 
-  scene.add(gltf.scene);
-});
 
 // 첫 번째 문 모델
 gltfLoader.load('/models/door1.glb', (gltf) => {
   const door1 = gltf.scene;
-  door1.position.set(-8, 2.2, 7.6); 
+  door1.position.set(6.38, 0.99, 1.13);
   door1.userData.isOpen = false;
   door1.userData.targetRotation = 0; 
   interactableDoors.push(door1);
@@ -83,7 +78,7 @@ gltfLoader.load('/models/door1.glb', (gltf) => {
 // 두 번째 문 모델
 gltfLoader.load('/models/door2.glb', (gltf) => {
   const door2 = gltf.scene;
-  door2.position.set(6.8, 2.2, 7.6
+  door2.position.set(4.66, 0.96, 3.75
   ); 
   door2.userData.isOpen = false;
   door2.userData.targetRotation = 0;
@@ -91,13 +86,23 @@ gltfLoader.load('/models/door2.glb', (gltf) => {
   scene.add(door2);
 });
 
+// 세 번째 문 모델
+gltfLoader.load('/models/door3.glb', (gltf) => {
+  const door3 = gltf.scene;
+  door3.position.set(0.7, 1.02, 3.75);
+  door3.userData.isOpen = false;
+  door3.userData.targetRotation = 0;
+  interactableDoors.push(door3);
+  scene.add(door3);
+});
+
 // ===== 입력 변수 =====
 const move = { forward: false, backward: false, left: false, right: false };
-const speed = 0.3; // 걷는 속도
+const speed = 0.117; // 걷는 속도 (현재값에서 30% 증가)
 
 let velocityY = 0;
 const gravity = 0.015;
-const jumpForce = 0.3;
+const jumpForce = 0.24;
 let canJump = true;
 
 // ===== 키보드/마우스 이벤트 =====
@@ -185,7 +190,7 @@ function updateMovement() {
   ];
 
   let isColliding = false;
-  const playerRadius = 0.5; 
+  const playerRadius = 0.3; 
 
   for (let i = 0; i < directions.length; i++) {
     collisionRaycaster.set(checkPos, directions[i]);
