@@ -2,6 +2,25 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <!-- GitHub Pages project URL(/Repo/)에서도 ./main.js 등이 저장소 경로로 잡히도록 base 설정 -->
+  <script>
+    (function () {
+      var path = location.pathname.replace(/\/+/g, '/');
+      var baseHref;
+      if (path === '/' || path === '') {
+        baseHref = '/';
+      } else if (path.endsWith('/')) {
+        baseHref = path;
+      } else if (/\.html$/i.test(path)) {
+        baseHref = path.replace(/[^/]+$/, '');
+      } else {
+        baseHref = path + '/';
+      }
+      var b = document.createElement('base');
+      b.href = baseHref;
+      document.head.insertBefore(b, document.head.firstChild);
+    })();
+  </script>
   <title>Three.js FPS</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
