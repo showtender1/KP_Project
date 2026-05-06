@@ -6,7 +6,6 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 
-// 레이캐스트를 BVH(O log n)로 가속 — 충돌 검사 프레임 드롭 핵심 해결
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
@@ -22,7 +21,7 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Retina 과부하 방지
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
@@ -52,26 +51,25 @@ const raycaster = new THREE.Raycaster();
 const centerPosition = new THREE.Vector2(0, 0);
 const interactableDoors = [];
 
-const collisionRaycaster = new THREE.Raycaster();
-const mapObjects = [];
-
 const PLAYER_RADIUS = 0.3;
+
+// 충돌용: 씬 전체 재귀 대신 메시만 flat 배열로 관리
+const collisionMeshes = [];
+const collisionRaycaster = new THREE.Raycaster();
+collisionRaycaster.far = PLAYER_RADIUS + 0.2; // 0.5m 이내만 검사 — BVH 불필요 탐색 차단
+
+// 4방향 (대각선 제거 — 벽 슬라이딩으로 충분히 커버됨)
 const COLLISION_DIRS = [
-  new THREE.Vector3(1, 0, 0),
-  new THREE.Vector3(-1, 0, 0),
-  new THREE.Vector3(0, 0, 1),
-  new THREE.Vector3(0, 0, -1),
-  new THREE.Vector3(1, 0, 1).normalize(),
-  new THREE.Vector3(-1, 0, -1).normalize(),
-  new THREE.Vector3(1, 0, -1).normalize(),
-  new THREE.Vector3(-1, 0, 1).normalize(),
+  new THREE.Vector3( 1, 0,  0),
+  new THREE.Vector3(-1, 0,  0),
+  new THREE.Vector3( 0, 0,  1),
+  new THREE.Vector3( 0, 0, -1),
 ];
-// 매 프레임 할당 없이 재사용하는 임시 벡터
-const _checkPos  = new THREE.Vector3();
-const _rightVec  = new THREE.Vector3();
+const _checkPos   = new THREE.Vector3();
+const _rightVec   = new THREE.Vector3();
 const _forwardVec = new THREE.Vector3();
 
-// 모델 로드
+// 로딩 UI
 const loadingEl   = document.getElementById('loading');
 const loadingText = document.getElementById('loading-text');
 const loadingManager = new THREE.LoadingManager();
@@ -86,11 +84,16 @@ const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
 
 gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
-  // BVH 구축 — 로드 직후 한 번만 수행, 이후 레이캐스트는 O(log n)
-  gltf.scene.traverse((child) => {
-    if (child.isMesh) child.geometry.computeBoundsTree();
+  gltf.scene.traverse((node) => {
+    // 정적 오브젝트는 매 프레임 행렬 재계산 불필요
+    node.matrixAutoUpdate = false;
+    node.updateMatrix();
+
+    if (node.isMesh) {
+      node.geometry.computeBoundsTree(); // BVH 구축
+      collisionMeshes.push(node);        // flat 배열로 수집
+    }
   });
-  mapObjects.push(gltf.scene);
   scene.add(gltf.scene);
 });
 
@@ -125,10 +128,10 @@ gltfLoader.load(assetUrl('models/door3.glb'), (gltf) => {
 // ===== 입력 =====
 const move = { forward: false, backward: false, left: false, right: false };
 
-const playerVel  = new THREE.Vector2(0, 0);
-const MAX_SPEED  = 7;
-const ACCEL      = 63;
-const FRICTION   = 9;
+const playerVel = new THREE.Vector2(0, 0);
+const MAX_SPEED = 7;
+const ACCEL     = 63;
+const FRICTION  = 9;
 
 let velocityY = 0;
 const GRAVITY    = 54;
@@ -187,12 +190,13 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ===== 충돌 체크 유틸 =====
+// ===== 충돌 체크 =====
 function checkCollision(pos) {
   _checkPos.set(pos.x, FIXED_Y - 1.0, pos.z);
   for (const dir of COLLISION_DIRS) {
     collisionRaycaster.set(_checkPos, dir);
-    const hits = collisionRaycaster.intersectObjects(mapObjects, true);
+    // false = 재귀 없음 (이미 flat 배열)
+    const hits = collisionRaycaster.intersectObjects(collisionMeshes, false);
     if (hits.length > 0 && hits[0].distance < PLAYER_RADIUS) return true;
   }
   return false;
@@ -202,7 +206,6 @@ function checkCollision(pos) {
 function updateMovement(delta) {
   if (!fps.isLocked) return;
 
-  // 가속 & 감속
   if (move.forward)  playerVel.y += ACCEL * delta;
   if (move.backward) playerVel.y -= ACCEL * delta;
   if (move.left)     playerVel.x -= ACCEL * delta;
@@ -212,11 +215,10 @@ function updateMovement(delta) {
   if (spd > MAX_SPEED) { const inv = MAX_SPEED / spd; playerVel.x *= inv; playerVel.y *= inv; }
   playerVel.multiplyScalar(Math.exp(-FRICTION * delta));
 
-  // 카메라 기준 월드 이동량 계산 (XZ만)
   _rightVec.setFromMatrixColumn(camera.matrix, 0);
   _rightVec.y = 0;
   _rightVec.normalize();
-  _forwardVec.crossVectors(fps.getObject().up, _rightVec); // 자동으로 단위벡터
+  _forwardVec.crossVectors(fps.getObject().up, _rightVec);
 
   const dx = (_rightVec.x * playerVel.x + _forwardVec.x * playerVel.y) * delta;
   const dz = (_rightVec.z * playerVel.x + _forwardVec.z * playerVel.y) * delta;
@@ -225,24 +227,22 @@ function updateMovement(delta) {
   const oldX = pos.x;
   const oldZ = pos.z;
 
-  if (mapObjects.length > 0 && Math.abs(dx) + Math.abs(dz) > 0.0001) {
-    // 1) 전체 이동 시도
+  if (collisionMeshes.length > 0 && Math.abs(dx) + Math.abs(dz) > 0.0001) {
     pos.x += dx; pos.z += dz;
 
     if (checkCollision(pos)) {
-      // 2) 전체 충돌 → X축 슬라이딩 시도
+      // X축 슬라이딩
       pos.x = oldX + dx; pos.z = oldZ;
-      if (checkCollision(pos)) pos.x = oldX; // X도 막히면 원위치
+      if (checkCollision(pos)) pos.x = oldX;
 
-      // 3) Z축 슬라이딩 시도
+      // Z축 슬라이딩
       pos.z = oldZ + dz;
-      if (checkCollision(pos)) pos.z = oldZ; // Z도 막히면 원위치
+      if (checkCollision(pos)) pos.z = oldZ;
     }
   } else {
     pos.x += dx; pos.z += dz;
   }
 
-  // 중력 + 점프
   velocityY -= GRAVITY * delta;
   pos.y += velocityY * delta;
   if (pos.y <= FIXED_Y) { pos.y = FIXED_Y; velocityY = 0; canJump = true; }
