@@ -23,13 +23,16 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.5;
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffeedd, 0.8));
-const light = new THREE.DirectionalLight(0xfffaf0, 1.5);
+scene.add(new THREE.AmbientLight(0xf5f2ec, 1.3)); // 밝고 균일한 크림 환경광
+const light = new THREE.DirectionalLight(0xffffff, 0.9); // 깨끗한 백색 주광
 light.position.set(5, 10, 7);
 scene.add(light);
+const fillLight = new THREE.DirectionalLight(0xe8eef4, 0.4); // 반대편 옅은 쿨톤 보조광
+fillLight.position.set(-5, 5, -5);
+scene.add(fillLight);
 
 const exrLoader = new EXRLoader();
 exrLoader.load(assetUrl('textures/sky.exr'), (texture) => {
