@@ -23,12 +23,12 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.2;
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5, 10, 5);
+scene.add(new THREE.AmbientLight(0xffeedd, 0.8));
+const light = new THREE.DirectionalLight(0xfffaf0, 1.5);
+light.position.set(5, 10, 7);
 scene.add(light);
 
 const exrLoader = new EXRLoader();
