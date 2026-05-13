@@ -23,16 +23,33 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.5;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xf5f2ec, 1.3)); // 밝고 균일한 크림 환경광
-const light = new THREE.DirectionalLight(0xffffff, 0.9); // 깨끗한 백색 주광
-light.position.set(5, 10, 7);
-scene.add(light);
-const fillLight = new THREE.DirectionalLight(0xe8eef4, 0.4); // 반대편 옅은 쿨톤 보조광
-fillLight.position.set(-5, 5, -5);
-scene.add(fillLight);
+// 하늘/바닥 반사광 — 실내 자연광 느낌
+const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.5);
+scene.add(hemiLight);
+
+// 창문으로 들어오는 따사로운 햇빛 (그림자 생성)
+const sunLight = new THREE.DirectionalLight(0xfff1cc, 2.2);
+sunLight.position.set(8, 14, 6);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far  = 60;
+sunLight.shadow.camera.left   = -20;
+sunLight.shadow.camera.right  =  20;
+sunLight.shadow.camera.top    =  20;
+sunLight.shadow.camera.bottom = -20;
+sunLight.shadow.bias = -0.001;
+scene.add(sunLight);
+
+// 반대편 은은한 바운스 광 (그림자가 너무 어둡지 않게)
+const bounceLight = new THREE.DirectionalLight(0xfce8c8, 0.4);
+bounceLight.position.set(-6, 4, -4);
+scene.add(bounceLight);
 
 const exrLoader = new EXRLoader();
 exrLoader.load(assetUrl('textures/sky.exr'), (texture) => {
@@ -88,13 +105,14 @@ gltfLoader.setDRACOLoader(dracoLoader);
 
 gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
   gltf.scene.traverse((node) => {
-    // 정적 오브젝트는 매 프레임 행렬 재계산 불필요
     node.matrixAutoUpdate = false;
     node.updateMatrix();
 
     if (node.isMesh) {
-      node.geometry.computeBoundsTree(); // BVH 구축
-      collisionMeshes.push(node);        // flat 배열로 수집
+      node.geometry.computeBoundsTree();
+      node.castShadow    = true;
+      node.receiveShadow = true;
+      collisionMeshes.push(node);
     }
   });
   scene.add(gltf.scene);
