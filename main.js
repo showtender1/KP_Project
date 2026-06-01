@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
@@ -28,35 +28,31 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// 하늘/바닥 반사광 — 실내 자연광 느낌
-const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.5);
+const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
 scene.add(hemiLight);
 
-// 창문으로 들어오는 따사로운 햇빛 (그림자 생성)
-const sunLight = new THREE.DirectionalLight(0xfff1cc, 2.2);
-sunLight.position.set(8, 14, 6);
-sunLight.castShadow = true;
-sunLight.shadow.mapSize.set(2048, 2048);
-sunLight.shadow.camera.near = 0.5;
-sunLight.shadow.camera.far  = 60;
-sunLight.shadow.camera.left   = -20;
-sunLight.shadow.camera.right  =  20;
-sunLight.shadow.camera.top    =  20;
-sunLight.shadow.camera.bottom = -20;
-sunLight.shadow.bias = -0.001;
-scene.add(sunLight);
+const roomLight1 = new THREE.PointLight(0xfff5e0, 6.0, 220);
+roomLight1.position.set(0, 2.1, 1.18);
+roomLight1.castShadow = true;
+roomLight1.shadow.mapSize.set(2048, 2048);
+roomLight1.shadow.camera.near = 0.1;
+roomLight1.shadow.camera.far = 220;
+roomLight1.shadow.bias = -0.001;
+scene.add(roomLight1);
 
-// 반대편 은은한 바운스 광 (그림자가 너무 어둡지 않게)
-const bounceLight = new THREE.DirectionalLight(0xfce8c8, 0.4);
-bounceLight.position.set(-6, 4, -4);
-scene.add(bounceLight);
+const roomLight2 = new THREE.PointLight(0xfff5e0, 6.0, 220);
+roomLight2.position.set(5.5, 2.1, 1.18);
+roomLight2.castShadow = true;
+roomLight2.shadow.mapSize.set(2048, 2048);
+roomLight2.shadow.camera.near = 0.1;
+roomLight2.shadow.camera.far = 220;
+roomLight2.shadow.bias = -0.001;
+scene.add(roomLight2);
 
-const exrLoader = new EXRLoader();
-exrLoader.load(assetUrl('textures/sky.exr'), (texture) => {
-  texture.mapping = THREE.EquirectangularReflectionMapping;
-  scene.background = texture;
-  scene.environment = texture;
-});
+scene.background = new THREE.Color(0x888888);
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
+pmremGenerator.dispose();
 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = true;
@@ -65,7 +61,7 @@ const fps = new PointerLockControls(camera, document.body);
 scene.add(fps.getObject());
 
 const FIXED_Y = 1.7;
-fps.getObject().position.set(-5, FIXED_Y, 10);
+fps.getObject().position.set(0, 0.02, 6.5);
 
 const raycaster = new THREE.Raycaster();
 const centerPosition = new THREE.Vector2(0, 0);
@@ -104,6 +100,7 @@ const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
 
 gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
+  gltf.scene.position.set(2.7, -0.02, 4.83);
   gltf.scene.traverse((node) => {
     node.matrixAutoUpdate = false;
     node.updateMatrix();
@@ -120,28 +117,31 @@ gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
 
 gltfLoader.load(assetUrl('models/door1.glb'), (gltf) => {
   const door1 = gltf.scene;
-  door1.position.set(6.38, 0.99, 1.13);
+  door1.position.set(6.35, 0.99, 1.18);
   door1.userData.isOpen = false;
   door1.userData.openRotationY = -Math.PI / 2;
   door1.userData.targetRotation = 0;
+  door1.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
   interactableDoors.push(door1);
   scene.add(door1);
 });
 
 gltfLoader.load(assetUrl('models/door2.glb'), (gltf) => {
   const door2 = gltf.scene;
-  door2.position.set(4.66, 0.96, 3.75);
+  door2.position.set(4.66, 0.96, 3.8);
   door2.userData.isOpen = false;
   door2.userData.targetRotation = 0;
+  door2.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
   interactableDoors.push(door2);
   scene.add(door2);
 });
 
 gltfLoader.load(assetUrl('models/door3.glb'), (gltf) => {
   const door3 = gltf.scene;
-  door3.position.set(0.7, 1.02, 3.75);
+  door3.position.set(2.68, 1.02, 3.8);
   door3.userData.isOpen = false;
   door3.userData.targetRotation = 0;
+  door3.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
   interactableDoors.push(door3);
   scene.add(door3);
 });
