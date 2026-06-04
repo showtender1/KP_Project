@@ -60,7 +60,7 @@ orbit.enabled = false;
 const fps = new PointerLockControls(camera, document.body);
 scene.add(fps.getObject());
 
-const BOAT_FLOOR_Y      = 13.0;
+const BOAT_FLOOR_Y      = 65.0;
 const CLASSROOM_FLOOR_Y = 1.7;
 let FIXED_Y = BOAT_FLOOR_Y;
 
