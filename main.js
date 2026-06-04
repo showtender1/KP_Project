@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
@@ -54,14 +53,14 @@ const pmremGenerator = new THREE.PMREMGenerator(renderer);
 scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
 pmremGenerator.dispose();
 
-const orbit = new OrbitControls(camera, renderer.domElement);
-orbit.enabled = true;
-
 const fps = new PointerLockControls(camera, document.body);
 scene.add(fps.getObject());
 
 const FIXED_Y = 1.7;
-fps.getObject().position.set(0, 0.02, 6.5);
+const BOAT_START    = new THREE.Vector3(0, FIXED_Y, 0);
+const CLASSROOM_START = new THREE.Vector3(0, FIXED_Y, 6.5);
+
+fps.getObject().position.copy(BOAT_START);
 
 const raycaster = new THREE.Raycaster();
 const centerPosition = new THREE.Vector2(0, 0);
@@ -69,12 +68,12 @@ const interactableDoors = [];
 
 const PLAYER_RADIUS = 0.3;
 
-// 충돌용: 씬 전체 재귀 대신 메시만 flat 배열로 관리
-const collisionMeshes = [];
+const boatCollisionMeshes      = [];
+const classroomCollisionMeshes = [];
+const collisionMeshes          = []; // 활성 씬의 충돌 메시
 const collisionRaycaster = new THREE.Raycaster();
-collisionRaycaster.far = PLAYER_RADIUS + 0.2; // 0.5m 이내만 검사 — BVH 불필요 탐색 차단
+collisionRaycaster.far = PLAYER_RADIUS + 0.2;
 
-// 4방향 (대각선 제거 — 벽 슬라이딩으로 충분히 커버됨)
 const COLLISION_DIRS = [
   new THREE.Vector3( 1, 0,  0),
   new THREE.Vector3(-1, 0,  0),
@@ -85,34 +84,68 @@ const _checkPos   = new THREE.Vector3();
 const _rightVec   = new THREE.Vector3();
 const _forwardVec = new THREE.Vector3();
 
-// 로딩 UI
+// 씬 그룹
+const boatGroup      = new THREE.Group();
+const classroomGroup = new THREE.Group();
+classroomGroup.visible = false;
+scene.add(boatGroup);
+scene.add(classroomGroup);
+
+let currentScene = 'boat';
+
+// UI 요소
 const loadingEl   = document.getElementById('loading');
 const loadingText = document.getElementById('loading-text');
+const clickHintEl = document.getElementById('click-hint');
+const enterBtn    = document.getElementById('enterClassroom');
+
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onProgress = (_url, loaded, total) => {
   loadingText.textContent = `로딩 중... ${Math.round(loaded / total * 100)}%`;
 };
-loadingManager.onLoad = () => { loadingEl.style.display = 'none'; };
+loadingManager.onLoad = () => {
+  loadingEl.style.display = 'none';
+  clickHintEl.style.display = 'flex';
+};
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/libs/draco/');
 const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
 
+// ===== 모델 로드 =====
+
+gltfLoader.load(assetUrl('models/boat.glb'), (gltf) => {
+  gltf.scene.traverse((node) => {
+    node.matrixAutoUpdate = false;
+    node.updateMatrix();
+    if (node.isMesh) {
+      node.geometry.computeBoundsTree();
+      node.castShadow    = true;
+      node.receiveShadow = true;
+      boatCollisionMeshes.push(node);
+    }
+  });
+  boatGroup.add(gltf.scene);
+  if (currentScene === 'boat') {
+    collisionMeshes.length = 0;
+    collisionMeshes.push(...boatCollisionMeshes);
+  }
+});
+
 gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
   gltf.scene.position.set(2.7, -0.02, 4.83);
   gltf.scene.traverse((node) => {
     node.matrixAutoUpdate = false;
     node.updateMatrix();
-
     if (node.isMesh) {
       node.geometry.computeBoundsTree();
       node.castShadow    = true;
       node.receiveShadow = true;
-      collisionMeshes.push(node);
+      classroomCollisionMeshes.push(node);
     }
   });
-  scene.add(gltf.scene);
+  classroomGroup.add(gltf.scene);
 });
 
 gltfLoader.load(assetUrl('models/door1.glb'), (gltf) => {
@@ -123,7 +156,7 @@ gltfLoader.load(assetUrl('models/door1.glb'), (gltf) => {
   door1.userData.targetRotation = 0;
   door1.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
   interactableDoors.push(door1);
-  scene.add(door1);
+  classroomGroup.add(door1);
 });
 
 gltfLoader.load(assetUrl('models/door2.glb'), (gltf) => {
@@ -133,7 +166,7 @@ gltfLoader.load(assetUrl('models/door2.glb'), (gltf) => {
   door2.userData.targetRotation = 0;
   door2.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
   interactableDoors.push(door2);
-  scene.add(door2);
+  classroomGroup.add(door2);
 });
 
 gltfLoader.load(assetUrl('models/door3.glb'), (gltf) => {
@@ -143,7 +176,7 @@ gltfLoader.load(assetUrl('models/door3.glb'), (gltf) => {
   door3.userData.targetRotation = 0;
   door3.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
   interactableDoors.push(door3);
-  scene.add(door3);
+  classroomGroup.add(door3);
 });
 
 // ===== 입력 =====
@@ -197,14 +230,35 @@ window.addEventListener('mousedown', (e) => {
   }
 });
 
-document.getElementById('firstView').addEventListener('click', () => {
-  orbit.enabled = false;
+// 화면 클릭 → FPS 진입
+renderer.domElement.addEventListener('click', () => {
+  if (!fps.isLocked) fps.lock();
+});
+
+fps.addEventListener('lock', () => {
+  clickHintEl.style.display = 'none';
+});
+
+fps.addEventListener('unlock', () => {
+  clickHintEl.style.display = 'flex';
+});
+
+// 씬 전환 버튼
+enterBtn.addEventListener('click', () => {
+  boatGroup.visible      = false;
+  classroomGroup.visible = true;
+  currentScene = 'classroom';
+
+  collisionMeshes.length = 0;
+  collisionMeshes.push(...classroomCollisionMeshes);
+
+  fps.getObject().position.copy(CLASSROOM_START);
+  velocityY = 0;
+
+  enterBtn.style.display = 'none';
   fps.lock();
 });
-document.getElementById('freeView').addEventListener('click', () => {
-  fps.unlock();
-  orbit.enabled = true;
-});
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -216,7 +270,6 @@ function checkCollision(pos) {
   _checkPos.set(pos.x, FIXED_Y - 1.0, pos.z);
   for (const dir of COLLISION_DIRS) {
     collisionRaycaster.set(_checkPos, dir);
-    // false = 재귀 없음 (이미 flat 배열)
     const hits = collisionRaycaster.intersectObjects(collisionMeshes, false);
     if (hits.length > 0 && hits[0].distance < PLAYER_RADIUS) return true;
   }
@@ -252,11 +305,9 @@ function updateMovement(delta) {
     pos.x += dx; pos.z += dz;
 
     if (checkCollision(pos)) {
-      // X축 슬라이딩
       pos.x = oldX + dx; pos.z = oldZ;
       if (checkCollision(pos)) pos.x = oldX;
 
-      // Z축 슬라이딩
       pos.z = oldZ + dz;
       if (checkCollision(pos)) pos.z = oldZ;
     }
@@ -277,11 +328,7 @@ function animate() {
   const delta = Math.min((now - _lastTime) / 1000, 0.05);
   _lastTime   = now;
 
-  if (fps.isLocked) {
-    updateMovement(delta);
-  } else if (orbit.enabled) {
-    orbit.update();
-  }
+  updateMovement(delta);
 
   const doorAlpha = 1 - Math.exp(-10 * delta);
   for (const door of interactableDoors) {
