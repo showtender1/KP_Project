@@ -62,7 +62,9 @@ scene.add(fps.getObject());
 
 const BOAT_FLOOR_Y      = 65.0;
 const CLASSROOM_FLOOR_Y = 1.7;
-const EYE_HEIGHT        = 1.7;
+const BOAT_EYE_HEIGHT      = 2.21; // 1.7 * 1.3
+const CLASSROOM_EYE_HEIGHT = 1.7;
+let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 
 const BOAT_START      = new THREE.Vector3(0, BOAT_FLOOR_Y, 0);
 const CLASSROOM_START = new THREE.Vector3(0, CLASSROOM_FLOOR_Y, 6.5);
@@ -277,6 +279,7 @@ function switchScene(to) {
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       currentScene = 'classroom';
+      EYE_HEIGHT = CLASSROOM_EYE_HEIGHT;
       collisionMeshes.length = 0;
       collisionMeshes.push(...classroomCollisionMeshes);
       fps.getObject().position.copy(CLASSROOM_START);
@@ -290,6 +293,7 @@ function switchScene(to) {
       classroomGroup.visible = false;
       boatGroup.visible      = true;
       currentScene = 'boat';
+      EYE_HEIGHT = BOAT_EYE_HEIGHT;
       collisionMeshes.length = 0;
       collisionMeshes.push(...boatCollisionMeshes);
       fps.getObject().position.copy(BOAT_START);
