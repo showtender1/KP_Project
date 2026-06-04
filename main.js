@@ -56,9 +56,12 @@ pmremGenerator.dispose();
 const fps = new PointerLockControls(camera, document.body);
 scene.add(fps.getObject());
 
-const FIXED_Y = 1.7;
-const BOAT_START    = new THREE.Vector3(0, FIXED_Y, 0);
-const CLASSROOM_START = new THREE.Vector3(0, FIXED_Y, 6.5);
+const BOAT_FLOOR_Y      = 3.0;
+const CLASSROOM_FLOOR_Y = 1.7;
+let FIXED_Y = BOAT_FLOOR_Y;
+
+const BOAT_START      = new THREE.Vector3(0, BOAT_FLOOR_Y, 0);
+const CLASSROOM_START = new THREE.Vector3(0, CLASSROOM_FLOOR_Y, 6.5);
 
 fps.getObject().position.copy(BOAT_START);
 
@@ -248,6 +251,8 @@ enterBtn.addEventListener('click', () => {
   boatGroup.visible      = false;
   classroomGroup.visible = true;
   currentScene = 'classroom';
+
+  FIXED_Y = CLASSROOM_FLOOR_Y;
 
   collisionMeshes.length = 0;
   collisionMeshes.push(...classroomCollisionMeshes);
