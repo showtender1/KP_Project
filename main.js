@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
@@ -53,10 +54,13 @@ const pmremGenerator = new THREE.PMREMGenerator(renderer);
 scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
 pmremGenerator.dispose();
 
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enabled = false;
+
 const fps = new PointerLockControls(camera, document.body);
 scene.add(fps.getObject());
 
-const BOAT_FLOOR_Y      = 3.0;
+const BOAT_FLOOR_Y      = 13.0;
 const CLASSROOM_FLOOR_Y = 1.7;
 let FIXED_Y = BOAT_FLOOR_Y;
 
@@ -73,7 +77,7 @@ const PLAYER_RADIUS = 0.3;
 
 const boatCollisionMeshes      = [];
 const classroomCollisionMeshes = [];
-const collisionMeshes          = []; // 활성 씬의 충돌 메시
+const collisionMeshes          = [];
 const collisionRaycaster = new THREE.Raycaster();
 collisionRaycaster.far = PLAYER_RADIUS + 0.2;
 
@@ -94,17 +98,25 @@ classroomGroup.visible = false;
 scene.add(boatGroup);
 scene.add(classroomGroup);
 
-let currentScene = 'boat';
+let currentScene  = 'boat';
+let transitioning = false;
 
 // UI 요소
-const loadingEl   = document.getElementById('loading');
-const loadingText = document.getElementById('loading-text');
-const clickHintEl = document.getElementById('click-hint');
-const enterBtn    = document.getElementById('enterClassroom');
+const loadingEl    = document.getElementById('loading');
+const loadingText  = document.getElementById('loading-text');
+const loadingBar   = document.getElementById('loading-bar');
+const clickHintEl  = document.getElementById('click-hint');
+const transitionEl = document.getElementById('transition-overlay');
+const enterBtn     = document.getElementById('enterClassroom');
+const returnBtn    = document.getElementById('returnBoat');
+const firstViewBtn = document.getElementById('firstView');
+const freeViewBtn  = document.getElementById('freeView');
 
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onProgress = (_url, loaded, total) => {
-  loadingText.textContent = `로딩 중... ${Math.round(loaded / total * 100)}%`;
+  const pct = Math.round(loaded / total * 100);
+  loadingText.textContent = `로딩 중... ${pct}%`;
+  loadingBar.style.width  = `${pct}%`;
 };
 loadingManager.onLoad = () => {
   loadingEl.style.display = 'none';
@@ -235,7 +247,7 @@ window.addEventListener('mousedown', (e) => {
 
 // 화면 클릭 → FPS 진입
 renderer.domElement.addEventListener('click', () => {
-  if (!fps.isLocked) fps.lock();
+  if (!fps.isLocked && !orbit.enabled && !transitioning) fps.lock();
 });
 
 fps.addEventListener('lock', () => {
@@ -243,25 +255,71 @@ fps.addEventListener('lock', () => {
 });
 
 fps.addEventListener('unlock', () => {
-  clickHintEl.style.display = 'flex';
+  if (!orbit.enabled && !transitioning) {
+    clickHintEl.style.display = 'flex';
+  }
 });
 
-// 씬 전환 버튼
-enterBtn.addEventListener('click', () => {
-  boatGroup.visible      = false;
-  classroomGroup.visible = true;
-  currentScene = 'classroom';
+// ===== 씬 전환 =====
+function switchScene(to) {
+  transitioning = true;
+  if (fps.isLocked) fps.unlock();
+  orbit.enabled = false;
+  clickHintEl.style.display = 'none';
 
-  FIXED_Y = CLASSROOM_FLOOR_Y;
+  transitionEl.classList.add('active');
 
-  collisionMeshes.length = 0;
-  collisionMeshes.push(...classroomCollisionMeshes);
+  setTimeout(() => {
+    if (to === 'classroom') {
+      boatGroup.visible      = false;
+      classroomGroup.visible = true;
+      currentScene = 'classroom';
+      FIXED_Y = CLASSROOM_FLOOR_Y;
+      collisionMeshes.length = 0;
+      collisionMeshes.push(...classroomCollisionMeshes);
+      fps.getObject().position.copy(CLASSROOM_START);
+      velocityY = 0;
 
-  fps.getObject().position.copy(CLASSROOM_START);
-  velocityY = 0;
+      enterBtn.style.display     = 'none';
+      returnBtn.style.display    = 'block';
+      firstViewBtn.style.display = 'block';
+      freeViewBtn.style.display  = 'block';
+    } else {
+      classroomGroup.visible = false;
+      boatGroup.visible      = true;
+      currentScene = 'boat';
+      FIXED_Y = BOAT_FLOOR_Y;
+      collisionMeshes.length = 0;
+      collisionMeshes.push(...boatCollisionMeshes);
+      fps.getObject().position.copy(BOAT_START);
+      velocityY = 0;
 
-  enterBtn.style.display = 'none';
+      returnBtn.style.display    = 'none';
+      firstViewBtn.style.display = 'none';
+      freeViewBtn.style.display  = 'none';
+      enterBtn.style.display     = 'block';
+    }
+
+    transitionEl.classList.remove('active');
+    setTimeout(() => {
+      transitioning = false;
+      clickHintEl.style.display = 'flex';
+    }, 320);
+  }, 600);
+}
+
+enterBtn.addEventListener('click',     () => switchScene('classroom'));
+returnBtn.addEventListener('click',    () => switchScene('boat'));
+
+firstViewBtn.addEventListener('click', () => {
+  orbit.enabled = false;
   fps.lock();
+});
+
+freeViewBtn.addEventListener('click', () => {
+  if (fps.isLocked) fps.unlock();
+  orbit.enabled = true;
+  clickHintEl.style.display = 'none';
 });
 
 window.addEventListener('resize', () => {
@@ -333,7 +391,11 @@ function animate() {
   const delta = Math.min((now - _lastTime) / 1000, 0.05);
   _lastTime   = now;
 
-  updateMovement(delta);
+  if (fps.isLocked) {
+    updateMovement(delta);
+  } else if (orbit.enabled) {
+    orbit.update();
+  }
 
   const doorAlpha = 1 - Math.exp(-10 * delta);
   for (const door of interactableDoors) {

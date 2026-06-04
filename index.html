@@ -2,7 +2,6 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <!-- GitHub Pages project URL(/Repo/)에서도 ./main.js 등이 저장소 경로로 잡히도록 base 설정 -->
   <script>
     (function () {
       var path = location.pathname.replace(/\/+/g, '/');
@@ -21,17 +20,32 @@
       document.head.insertBefore(b, document.head.firstChild);
     })();
   </script>
-  <title>Three.js FPS</title>
+  <title>KP Project</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
 
   <div id="loading">
+    <div class="loading-title">KP Project</div>
+    <div class="loading-spinner"></div>
+    <div class="loading-bar-track">
+      <div id="loading-bar"></div>
+    </div>
     <div id="loading-text">로딩 중... 0%</div>
+  </div>
+
+  <div id="transition-overlay">
+    <div id="transition-text">
+      <div class="transition-spinner"></div>
+      이동 중...
+    </div>
   </div>
 
   <div id="ui">
     <button id="enterClassroom">선박 내부로 이동</button>
+    <button id="returnBoat"  style="display:none">보트로 돌아가기</button>
+    <button id="firstView"   style="display:none">1인칭 시점</button>
+    <button id="freeView"    style="display:none">자유 시점</button>
   </div>
 
   <div id="click-hint">
