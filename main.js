@@ -21,11 +21,11 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
@@ -42,7 +42,7 @@ scene.add(roomLight1);
 
 const roomLight2 = new THREE.PointLight(0xfff5e0, 6.0, 220);
 roomLight2.position.set(5.5, 2.1, 1.18);
-roomLight2.castShadow = true;
+roomLight2.castShadow = false;
 roomLight2.shadow.mapSize.set(512, 512);
 roomLight2.shadow.camera.near = 0.1;
 roomLight2.shadow.camera.far = 15;
