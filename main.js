@@ -34,18 +34,18 @@ scene.add(hemiLight);
 const roomLight1 = new THREE.PointLight(0xfff5e0, 6.0, 220);
 roomLight1.position.set(0, 2.1, 1.18);
 roomLight1.castShadow = true;
-roomLight1.shadow.mapSize.set(2048, 2048);
+roomLight1.shadow.mapSize.set(512, 512);
 roomLight1.shadow.camera.near = 0.1;
-roomLight1.shadow.camera.far = 220;
+roomLight1.shadow.camera.far = 15;
 roomLight1.shadow.bias = -0.001;
 scene.add(roomLight1);
 
 const roomLight2 = new THREE.PointLight(0xfff5e0, 6.0, 220);
 roomLight2.position.set(5.5, 2.1, 1.18);
 roomLight2.castShadow = true;
-roomLight2.shadow.mapSize.set(2048, 2048);
+roomLight2.shadow.mapSize.set(512, 512);
 roomLight2.shadow.camera.near = 0.1;
-roomLight2.shadow.camera.far = 220;
+roomLight2.shadow.camera.far = 15;
 roomLight2.shadow.bias = -0.001;
 scene.add(roomLight2);
 
