@@ -62,7 +62,7 @@ scene.add(fps.getObject());
 
 const BOAT_FLOOR_Y      = 65.0;
 const CLASSROOM_FLOOR_Y = 1.7;
-let FIXED_Y = BOAT_FLOOR_Y;
+const EYE_HEIGHT        = 1.7;
 
 const BOAT_START      = new THREE.Vector3(0, BOAT_FLOOR_Y, 0);
 const CLASSROOM_START = new THREE.Vector3(0, CLASSROOM_FLOOR_Y, 6.5);
@@ -87,9 +87,12 @@ const COLLISION_DIRS = [
   new THREE.Vector3( 0, 0,  1),
   new THREE.Vector3( 0, 0, -1),
 ];
-const _checkPos   = new THREE.Vector3();
-const _rightVec   = new THREE.Vector3();
-const _forwardVec = new THREE.Vector3();
+const _checkPos     = new THREE.Vector3();
+const _rightVec     = new THREE.Vector3();
+const _forwardVec   = new THREE.Vector3();
+const _groundOrigin = new THREE.Vector3();
+const _downVec      = new THREE.Vector3(0, -1, 0);
+const groundRaycaster = new THREE.Raycaster();
 
 // 씬 그룹
 const boatGroup      = new THREE.Group();
@@ -274,7 +277,6 @@ function switchScene(to) {
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       currentScene = 'classroom';
-      FIXED_Y = CLASSROOM_FLOOR_Y;
       collisionMeshes.length = 0;
       collisionMeshes.push(...classroomCollisionMeshes);
       fps.getObject().position.copy(CLASSROOM_START);
@@ -288,7 +290,6 @@ function switchScene(to) {
       classroomGroup.visible = false;
       boatGroup.visible      = true;
       currentScene = 'boat';
-      FIXED_Y = BOAT_FLOOR_Y;
       collisionMeshes.length = 0;
       collisionMeshes.push(...boatCollisionMeshes);
       fps.getObject().position.copy(BOAT_START);
@@ -328,9 +329,18 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// ===== 바닥 감지 (하방 레이캐스트) =====
+function getGroundY(pos) {
+  _groundOrigin.set(pos.x, pos.y, pos.z);
+  groundRaycaster.set(_groundOrigin, _downVec);
+  groundRaycaster.far = EYE_HEIGHT + 1.5;
+  const hits = groundRaycaster.intersectObjects(collisionMeshes, false);
+  return hits.length > 0 ? hits[0].point.y + EYE_HEIGHT : -Infinity;
+}
+
 // ===== 충돌 체크 =====
 function checkCollision(pos) {
-  _checkPos.set(pos.x, FIXED_Y - 1.0, pos.z);
+  _checkPos.set(pos.x, pos.y - 1.0, pos.z);
   for (const dir of COLLISION_DIRS) {
     collisionRaycaster.set(_checkPos, dir);
     const hits = collisionRaycaster.intersectObjects(collisionMeshes, false);
@@ -380,7 +390,17 @@ function updateMovement(delta) {
 
   velocityY -= GRAVITY * delta;
   pos.y += velocityY * delta;
-  if (pos.y <= FIXED_Y) { pos.y = FIXED_Y; velocityY = 0; canJump = true; }
+
+  const groundY = getGroundY(pos);
+  if (groundY > -Infinity && pos.y <= groundY) {
+    pos.y = groundY;
+    velocityY = 0;
+    canJump = true;
+  } else if (currentScene === 'classroom' && pos.y <= CLASSROOM_FLOOR_Y) {
+    pos.y = CLASSROOM_FLOOR_Y;
+    velocityY = 0;
+    canJump = true;
+  }
 }
 
 // ===== 루프 =====
