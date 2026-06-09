@@ -119,15 +119,15 @@ const firstViewBtn = document.getElementById('firstView');
 const freeViewBtn  = document.getElementById('freeView');
 
 const loadingManager = new THREE.LoadingManager();
-loadingManager.onProgress = (_url, loaded, total) => {
-  const pct = Math.round(loaded / total * 100);
-  loadingText.textContent = `로딩 중... ${pct}%`;
-  loadingBar.style.width  = `${pct}%`;
-};
 loadingManager.onLoad = () => {
   loadingEl.style.display = 'none';
   clickHintEl.style.display = 'flex';
 };
+
+function setLoadingProgress(pct) {
+  loadingText.textContent = `로딩 중... ${pct}%`;
+  loadingBar.style.width  = `${pct}%`;
+}
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/libs/draco/');
@@ -145,24 +145,37 @@ let classroomLoading = false;
 
 // ===== 모델 로드 =====
 
-// Boat만 초기 로딩
-gltfLoader.load(assetUrl('models/boat.glb'), (gltf) => {
-  gltf.scene.traverse((node) => {
-    node.matrixAutoUpdate = false;
-    node.updateMatrix();
-    if (node.isMesh) {
-      node.geometry.computeBoundsTree();
-      node.castShadow    = true;
-      node.receiveShadow = true;
-      boatCollisionMeshes.push(node);
+// Boat만 초기 로딩 (바이트 단위 진행률 표시)
+gltfLoader.load(
+  assetUrl('models/boat.glb'),
+  (gltf) => {
+    gltf.scene.traverse((node) => {
+      node.matrixAutoUpdate = false;
+      node.updateMatrix();
+      if (node.isMesh) {
+        node.geometry.computeBoundsTree();
+        node.castShadow    = true;
+        node.receiveShadow = true;
+        boatCollisionMeshes.push(node);
+      }
+    });
+    boatGroup.add(gltf.scene);
+    if (currentScene === 'boat') {
+      collisionMeshes.length = 0;
+      collisionMeshes.push(...boatCollisionMeshes);
     }
-  });
-  boatGroup.add(gltf.scene);
-  if (currentScene === 'boat') {
-    collisionMeshes.length = 0;
-    collisionMeshes.push(...boatCollisionMeshes);
+  },
+  (event) => {
+    // 바이트 단위 실제 다운로드 진행률
+    if (event.total > 0) {
+      setLoadingProgress(Math.round(event.loaded / event.total * 100));
+    }
+  },
+  (error) => {
+    console.error('boat.glb 로드 오류:', error);
+    loadingText.textContent = '로딩 오류 — 새로고침 해주세요';
   }
-});
+);
 
 // ===== 교실 지연 로딩 =====
 function loadClassroomAssets(onComplete) {
