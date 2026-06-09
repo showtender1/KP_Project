@@ -107,7 +107,7 @@ let currentScene  = 'boat';
 let transitioning = false;
 
 // 포털 판 (투명, 클릭 시 선박 내부로 이동)
-const portalGeom = new THREE.PlaneGeometry(1, 1);
+const portalGeom = new THREE.PlaneGeometry(5, 5);
 const portalMat  = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
 const portalMesh = new THREE.Mesh(portalGeom, portalMat);
 portalMesh.position.set(-0.03, 16.94, -37.47);
