@@ -106,12 +106,21 @@ scene.add(classroomGroup);
 let currentScene  = 'boat';
 let transitioning = false;
 
+// 포털 판 (투명, 클릭 시 선박 내부로 이동)
+const portalGeom = new THREE.PlaneGeometry(1, 1);
+const portalMat  = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+const portalMesh = new THREE.Mesh(portalGeom, portalMat);
+portalMesh.position.set(-0.03, 16.94, -37.47);
+boatGroup.add(portalMesh);
+
 // UI 요소
 const loadingEl    = document.getElementById('loading');
 const loadingText  = document.getElementById('loading-text');
 const loadingBar   = document.getElementById('loading-bar');
 const clickHintEl  = document.getElementById('click-hint');
-const transitionEl = document.getElementById('transition-overlay');
+const transitionEl  = document.getElementById('transition-overlay');
+const transitionMsg = document.getElementById('transition-msg');
+const transitionPct = document.getElementById('transition-pct');
 const enterBtn     = document.getElementById('enterClassroom');
 const returnBtn    = document.getElementById('returnBoat');
 const coordsEl     = document.getElementById('coords');
@@ -178,13 +187,18 @@ gltfLoader.load(
 );
 
 // ===== 교실 지연 로딩 =====
-function loadClassroomAssets(onComplete) {
+function loadClassroomAssets(onComplete, onProgress) {
   if (classroomReady)   { onComplete(); return; }
   if (classroomLoading) { return; }
   classroomLoading = true;
 
-  let pending = 4;
-  const check = () => { if (--pending === 0) { classroomReady = true; classroomLoading = false; onComplete(); } };
+  let loaded = 0;
+  const total = 4;
+  const check = () => {
+    loaded++;
+    if (onProgress) onProgress(Math.round(loaded / total * 100));
+    if (loaded === total) { classroomReady = true; classroomLoading = false; onComplete(); }
+  };
 
   classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
     gltf.scene.position.set(2.7, -0.02, 4.83);
@@ -281,6 +295,13 @@ document.addEventListener('keyup', (e) => {
 window.addEventListener('mousedown', (e) => {
   if (!fps.isLocked || e.button !== 0) return;
   raycaster.setFromCamera(centerPosition, camera);
+
+  // 포털 클릭 (보트 씬에서만)
+  if (currentScene === 'boat' && !transitioning) {
+    const portalHit = raycaster.intersectObject(portalMesh, false);
+    if (portalHit.length > 0) { switchScene('classroom'); return; }
+  }
+
   const intersects = raycaster.intersectObjects(interactableDoors, true);
   if (intersects.length > 0) {
     let clicked = intersects[0].object;
@@ -320,7 +341,14 @@ function switchScene(to) {
   transitionEl.classList.add('active');
 
   if (to === 'classroom') {
+    transitionMsg.textContent = '선박 내부로 이동 중...';
+    if (!classroomReady) {
+      transitionPct.style.display = 'block';
+      transitionPct.textContent   = '0%';
+    }
     loadClassroomAssets(() => {
+      transitionPct.style.display = 'none';
+      transitionMsg.textContent   = '이동 중...';
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       currentScene = 'classroom';
@@ -337,7 +365,7 @@ function switchScene(to) {
 
       transitionEl.classList.remove('active');
       setTimeout(() => { transitioning = false; clickHintEl.style.display = 'flex'; }, 320);
-    });
+    }, (pct) => { transitionPct.textContent = `${pct}%`; });
   } else {
     setTimeout(() => {
       classroomGroup.visible = false;
