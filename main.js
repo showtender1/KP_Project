@@ -292,7 +292,7 @@ function loadClassroomAssets(onComplete, onProgress) {
 }
 
 // ===== XR 조이스틱 입력 =====
-let xrMoveX = 0, xrMoveZ = 0, xrSnapActive = false;
+let xrMoveX = 0, xrMoveZ = 0;
 
 function updateXRInput() {
   const session = renderer.xr.getSession();
@@ -304,15 +304,6 @@ function updateXRInput() {
     if (src.handedness === 'left') {
       if (Math.abs(ax[2]) > 0.15) xrMoveX = ax[2];
       if (Math.abs(ax[3]) > 0.15) xrMoveZ = ax[3];
-    }
-    if (src.handedness === 'right') {
-      // 우측 조이스틱: 30도 스냅 턴
-      if (Math.abs(ax[2]) > 0.7 && !xrSnapActive) {
-        playerRig.rotation.y -= Math.sign(ax[2]) * (Math.PI / 6);
-        xrSnapActive = true;
-      } else if (Math.abs(ax[2]) < 0.3) {
-        xrSnapActive = false;
-      }
     }
   }
 }
