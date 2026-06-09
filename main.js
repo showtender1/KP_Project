@@ -5,11 +5,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
-
-THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
-THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
-THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 function assetUrl(relativePath) {
   return new URL(relativePath, import.meta.url).href;
@@ -172,22 +167,6 @@ classroomLoader.setDRACOLoader(dracoLoader);
 let classroomReady   = false;
 let classroomLoading = false;
 
-// ===== BVH 가속 레이캐스팅 (8ms 청크로 백그라운드 연산) =====
-function computeBVHDeferred(meshes) {
-  let i = 0;
-  function step() {
-    const deadline = performance.now() + 8;
-    while (i < meshes.length && performance.now() < deadline) {
-      if (meshes[i].geometry && !meshes[i].geometry.boundsTree) {
-        meshes[i].geometry.computeBoundsTree();
-      }
-      i++;
-    }
-    if (i < meshes.length) setTimeout(step, 0);
-  }
-  setTimeout(step, 200);
-}
-
 // ===== 모델 로드 =====
 
 // Boat만 초기 로딩 (바이트 단위 진행률 표시)
@@ -208,7 +187,6 @@ gltfLoader.load(
       collisionMeshes.length = 0;
       collisionMeshes.push(...boatCollisionMeshes);
     }
-    computeBVHDeferred(boatCollisionMeshes);
   },
   (event) => {
     // 바이트 단위 실제 다운로드 진행률
@@ -233,12 +211,7 @@ function loadClassroomAssets(onComplete, onProgress) {
   const check = () => {
     loaded++;
     if (onProgress) onProgress(Math.round(loaded / total * 100));
-    if (loaded === total) {
-      computeBVHDeferred(classroomCollisionMeshes);
-      classroomReady = true;
-      classroomLoading = false;
-      onComplete();
-    }
+    if (loaded === total) { classroomReady = true; classroomLoading = false; onComplete(); }
   };
 
   classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
@@ -532,18 +505,21 @@ function updateMovement(delta) {
     pos.x += dx; pos.z += dz;
   }
 
-  velocityY -= GRAVITY * delta;
-  pos.y += velocityY * delta;
+  // VR: 사용자가 실제 바닥 위에 서 있으므로 중력/바닥감지 불필요
+  if (!isXR) {
+    velocityY -= GRAVITY * delta;
+    pos.y += velocityY * delta;
 
-  const groundY = getGroundY(pos);
-  if (groundY > -Infinity && pos.y <= groundY) {
-    pos.y = groundY;
-    velocityY = 0;
-    canJump = true;
-  } else if (currentScene === 'classroom' && pos.y <= CLASSROOM_FLOOR_Y) {
-    pos.y = CLASSROOM_FLOOR_Y;
-    velocityY = 0;
-    canJump = true;
+    const groundY = getGroundY(pos);
+    if (groundY > -Infinity && pos.y <= groundY) {
+      pos.y = groundY;
+      velocityY = 0;
+      canJump = true;
+    } else if (currentScene === 'classroom' && pos.y <= CLASSROOM_FLOOR_Y) {
+      pos.y = CLASSROOM_FLOOR_Y;
+      velocityY = 0;
+      canJump = true;
+    }
   }
 }
 
