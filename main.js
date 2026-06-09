@@ -28,8 +28,8 @@ renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.xr.enabled = true;
-renderer.xr.setFramebufferScaleFactor(0.5);
-renderer.xr.setFoveation(1.0);
+renderer.xr.setFramebufferScaleFactor(0.75);
+renderer.xr.setFoveation(0.0);
 renderer.xr.setReferenceSpaceType('local'); // local-floor 대신 local: 카메라가 playerRig 위치에서 시작
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
@@ -525,7 +525,8 @@ function updateMovement(delta) {
   const oldX = pos.x;
   const oldZ = pos.z;
 
-  if (collisionMeshes.length > 0 && Math.abs(dx) + Math.abs(dz) > 0.0001) {
+  if (!isXR && collisionMeshes.length > 0 && Math.abs(dx) + Math.abs(dz) > 0.0001) {
+    // 데스크톱: 벽 충돌 + 슬라이딩
     pos.x += dx; pos.z += dz;
 
     if (checkCollision(pos)) {
@@ -536,6 +537,7 @@ function updateMovement(delta) {
       if (checkCollision(pos)) pos.z = oldZ;
     }
   } else {
+    // VR: 벽 충돌 스킵 (레이캐스트 CPU 절감)
     pos.x += dx; pos.z += dz;
   }
 
