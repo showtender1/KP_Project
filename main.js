@@ -62,7 +62,7 @@ scene.add(fps.getObject());
 
 const BOAT_FLOOR_Y = 35.0;
 const CLASSROOM_FLOOR_Y = 1.7;
-const BOAT_EYE_HEIGHT      = 8.84; // 4.42 * 2
+const BOAT_EYE_HEIGHT      = 6; // 4.42 * 2
 const CLASSROOM_EYE_HEIGHT = 1.7;
 let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 
@@ -238,10 +238,11 @@ function loadClassroomAssets(onComplete) {
 }
 
 // ===== 입력 =====
-const move = { forward: false, backward: false, left: false, right: false };
+const move = { forward: false, backward: false, left: false, right: false, sprint: false };
 
 const playerVel = new THREE.Vector2(0, 0);
 const MAX_SPEED = 7;
+const SPRINT_MULTIPLIER = 2.0;
 const ACCEL     = 63;
 const FRICTION  = 9;
 
@@ -259,6 +260,9 @@ document.addEventListener('keydown', (e) => {
     case 'Space':
       if (canJump && fps.isLocked) { velocityY = JUMP_FORCE; canJump = false; }
       break;
+    case 'ShiftLeft':
+    case 'ShiftRight':
+      move.sprint = true; break;
   }
 });
 
@@ -268,6 +272,9 @@ document.addEventListener('keyup', (e) => {
     case 'KeyS': move.backward = false; break;
     case 'KeyA': move.left     = false; break;
     case 'KeyD': move.right    = false; break;
+    case 'ShiftLeft':
+    case 'ShiftRight':
+      move.sprint = false; break;
   }
 });
 
@@ -402,8 +409,9 @@ function updateMovement(delta) {
   if (move.left)     playerVel.x -= ACCEL * delta;
   if (move.right)    playerVel.x += ACCEL * delta;
 
+  const curMaxSpeed = move.sprint ? MAX_SPEED * SPRINT_MULTIPLIER : MAX_SPEED;
   const spd = Math.sqrt(playerVel.x ** 2 + playerVel.y ** 2);
-  if (spd > MAX_SPEED) { const inv = MAX_SPEED / spd; playerVel.x *= inv; playerVel.y *= inv; }
+  if (spd > curMaxSpeed) { const inv = curMaxSpeed / spd; playerVel.x *= inv; playerVel.y *= inv; }
   playerVel.multiplyScalar(Math.exp(-FRICTION * delta));
 
   _rightVec.setFromMatrixColumn(camera.matrix, 0);
