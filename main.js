@@ -131,11 +131,21 @@ loadingManager.onLoad = () => {
 
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/libs/draco/');
+
+// 초기 로딩용 (boat만 추적)
 const gltfLoader = new GLTFLoader(loadingManager);
 gltfLoader.setDRACOLoader(dracoLoader);
 
+// 교실 지연 로딩용 (LoadingManager 없음)
+const classroomLoader = new GLTFLoader();
+classroomLoader.setDRACOLoader(dracoLoader);
+
+let classroomReady   = false;
+let classroomLoading = false;
+
 // ===== 모델 로드 =====
 
+// Boat만 초기 로딩
 gltfLoader.load(assetUrl('models/boat.glb'), (gltf) => {
   gltf.scene.traverse((node) => {
     node.matrixAutoUpdate = false;
@@ -154,51 +164,65 @@ gltfLoader.load(assetUrl('models/boat.glb'), (gltf) => {
   }
 });
 
-gltfLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
-  gltf.scene.position.set(2.7, -0.02, 4.83);
-  gltf.scene.traverse((node) => {
-    node.matrixAutoUpdate = false;
-    node.updateMatrix();
-    if (node.isMesh) {
-      node.geometry.computeBoundsTree();
-      node.castShadow    = true;
-      node.receiveShadow = true;
-      classroomCollisionMeshes.push(node);
-    }
+// ===== 교실 지연 로딩 =====
+function loadClassroomAssets(onComplete) {
+  if (classroomReady)   { onComplete(); return; }
+  if (classroomLoading) { return; }
+  classroomLoading = true;
+
+  let pending = 4;
+  const check = () => { if (--pending === 0) { classroomReady = true; classroomLoading = false; onComplete(); } };
+
+  classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
+    gltf.scene.position.set(2.7, -0.02, 4.83);
+    gltf.scene.traverse((node) => {
+      node.matrixAutoUpdate = false;
+      node.updateMatrix();
+      if (node.isMesh) {
+        node.geometry.computeBoundsTree();
+        node.castShadow    = true;
+        node.receiveShadow = true;
+        classroomCollisionMeshes.push(node);
+      }
+    });
+    classroomGroup.add(gltf.scene);
+    check();
   });
-  classroomGroup.add(gltf.scene);
-});
 
-gltfLoader.load(assetUrl('models/door1.glb'), (gltf) => {
-  const door1 = gltf.scene;
-  door1.position.set(6.35, 0.99, 1.18);
-  door1.userData.isOpen = false;
-  door1.userData.openRotationY = -Math.PI / 2;
-  door1.userData.targetRotation = 0;
-  door1.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-  interactableDoors.push(door1);
-  classroomGroup.add(door1);
-});
+  classroomLoader.load(assetUrl('models/door1.glb'), (gltf) => {
+    const door1 = gltf.scene;
+    door1.position.set(6.35, 0.99, 1.18);
+    door1.userData.isOpen = false;
+    door1.userData.openRotationY = -Math.PI / 2;
+    door1.userData.targetRotation = 0;
+    door1.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+    interactableDoors.push(door1);
+    classroomGroup.add(door1);
+    check();
+  });
 
-gltfLoader.load(assetUrl('models/door2.glb'), (gltf) => {
-  const door2 = gltf.scene;
-  door2.position.set(4.66, 0.96, 3.8);
-  door2.userData.isOpen = false;
-  door2.userData.targetRotation = 0;
-  door2.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-  interactableDoors.push(door2);
-  classroomGroup.add(door2);
-});
+  classroomLoader.load(assetUrl('models/door2.glb'), (gltf) => {
+    const door2 = gltf.scene;
+    door2.position.set(4.66, 0.96, 3.8);
+    door2.userData.isOpen = false;
+    door2.userData.targetRotation = 0;
+    door2.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+    interactableDoors.push(door2);
+    classroomGroup.add(door2);
+    check();
+  });
 
-gltfLoader.load(assetUrl('models/door3.glb'), (gltf) => {
-  const door3 = gltf.scene;
-  door3.position.set(2.68, 1.02, 3.8);
-  door3.userData.isOpen = false;
-  door3.userData.targetRotation = 0;
-  door3.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-  interactableDoors.push(door3);
-  classroomGroup.add(door3);
-});
+  classroomLoader.load(assetUrl('models/door3.glb'), (gltf) => {
+    const door3 = gltf.scene;
+    door3.position.set(2.68, 1.02, 3.8);
+    door3.userData.isOpen = false;
+    door3.userData.targetRotation = 0;
+    door3.traverse((n) => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+    interactableDoors.push(door3);
+    classroomGroup.add(door3);
+    check();
+  });
+}
 
 // ===== 입력 =====
 const move = { forward: false, backward: false, left: false, right: false };
@@ -275,8 +299,8 @@ function switchScene(to) {
 
   transitionEl.classList.add('active');
 
-  setTimeout(() => {
-    if (to === 'classroom') {
+  if (to === 'classroom') {
+    loadClassroomAssets(() => {
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       currentScene = 'classroom';
@@ -290,7 +314,12 @@ function switchScene(to) {
       returnBtn.style.display    = 'block';
       firstViewBtn.style.display = 'block';
       freeViewBtn.style.display  = 'block';
-    } else {
+
+      transitionEl.classList.remove('active');
+      setTimeout(() => { transitioning = false; clickHintEl.style.display = 'flex'; }, 320);
+    });
+  } else {
+    setTimeout(() => {
       classroomGroup.visible = false;
       boatGroup.visible      = true;
       currentScene = 'boat';
@@ -304,14 +333,11 @@ function switchScene(to) {
       firstViewBtn.style.display = 'none';
       freeViewBtn.style.display  = 'none';
       enterBtn.style.display     = 'block';
-    }
 
-    transitionEl.classList.remove('active');
-    setTimeout(() => {
-      transitioning = false;
-      clickHintEl.style.display = 'flex';
-    }, 320);
-  }, 600);
+      transitionEl.classList.remove('active');
+      setTimeout(() => { transitioning = false; clickHintEl.style.display = 'flex'; }, 320);
+    }, 600);
+  }
 }
 
 enterBtn.addEventListener('click',     () => switchScene('classroom'));
