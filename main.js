@@ -123,10 +123,12 @@ const transitionMsg = document.getElementById('transition-msg');
 const transitionPct = document.getElementById('transition-pct');
 const coordsEl     = document.getElementById('coords');
 
+let _pendingLoadReveal = false;
+
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onLoad = () => {
-  loadingEl.style.display = 'none';
-  clickHintEl.style.display = 'flex';
+  // 실제 렌더 완료 후 숨기도록 플래그만 세팅
+  _pendingLoadReveal = true;
 };
 
 function setLoadingProgress(pct) {
@@ -352,6 +354,8 @@ function switchScene(to) {
       collisionMeshes.length = 0;
       collisionMeshes.push(...classroomCollisionMeshes);
       fps.getObject().position.copy(CLASSROOM_START);
+      fps.getObject().rotation.y = -Math.PI / 2; // 우측 90도
+      camera.rotation.x = 0;                     // 수평 시선 초기화
       velocityY = 0;
 
       transitionEl.classList.remove('active');
@@ -480,6 +484,13 @@ function animate() {
   }
 
   renderer.render(scene, camera);
+
+  // 렌더가 실제로 끝난 직후 로딩 화면 제거
+  if (_pendingLoadReveal) {
+    _pendingLoadReveal = false;
+    loadingEl.style.display = 'none';
+    clickHintEl.style.display = 'flex';
+  }
 }
 
 animate();
