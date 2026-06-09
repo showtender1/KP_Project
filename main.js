@@ -23,16 +23,21 @@ renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.xr.enabled = true;
-renderer.xr.setFramebufferScaleFactor(0.75); // Quest 2 GPU 부하 감소
+renderer.xr.setFramebufferScaleFactor(0.75);
+renderer.xr.setReferenceSpaceType('local'); // local-floor 대신 local: 카메라가 playerRig 위치에서 시작
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
 
-// VR 진입 시 그림자 끄기 (모바일 GPU 과부하 방지)
+// VR 세션 시작: 그림자 끄기 + 포인터락 해제 + 클릭힌트 숨기기
 renderer.xr.addEventListener('sessionstart', () => {
   renderer.shadowMap.enabled = false;
+  if (fps.isLocked) fps.unlock();
+  clickHintEl.style.display = 'none';
 });
+// VR 세션 종료: 그림자 복원 + 클릭힌트 표시
 renderer.xr.addEventListener('sessionend', () => {
   renderer.shadowMap.enabled = true;
+  if (!transitioning) clickHintEl.style.display = 'flex';
 });
 
 const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
@@ -311,6 +316,8 @@ const JUMP_FORCE = 14;
 let canJump = true;
 
 document.addEventListener('keydown', (e) => {
+  // WASD 키 입력으로도 FPS 모드 진입
+  if (['KeyW','KeyA','KeyS','KeyD'].includes(e.code)) tryLockFPS();
   switch (e.code) {
     case 'KeyW': move.forward  = true; break;
     case 'KeyS': move.backward = true; break;
@@ -361,10 +368,11 @@ window.addEventListener('mousedown', (e) => {
   }
 });
 
-// 화면 클릭 → FPS 진입
-renderer.domElement.addEventListener('click', () => {
-  if (!fps.isLocked && !orbit.enabled && !transitioning) fps.lock();
-});
+// 화면 클릭 or 키 입력 → 데스크톱 FPS 진입 (VR 모드가 아닐 때만)
+function tryLockFPS() {
+  if (!fps.isLocked && !orbit.enabled && !transitioning && !renderer.xr.isPresenting) fps.lock();
+}
+renderer.domElement.addEventListener('click', tryLockFPS);
 
 fps.addEventListener('lock', () => {
   clickHintEl.style.display = 'none';
