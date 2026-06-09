@@ -4,6 +4,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
@@ -26,7 +27,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
+document.body.appendChild(VRButton.createButton(renderer));
 
 const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
 scene.add(hemiLight);
@@ -58,7 +61,11 @@ const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = false;
 
 const fps = new PointerLockControls(camera, document.body);
-scene.add(fps.getObject());
+
+// playerRig: 이동의 기준점. camera는 rig 안에 있어 XR/데스크톱 모두 동작
+const playerRig = new THREE.Group();
+playerRig.add(camera);
+scene.add(playerRig);
 
 const BOAT_FLOOR_Y = 35.0;
 const CLASSROOM_FLOOR_Y = 1.7;
@@ -69,7 +76,7 @@ let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 const BOAT_START      = new THREE.Vector3(-0.3, 25.47, 53.14);
 const CLASSROOM_START = new THREE.Vector3(0, CLASSROOM_FLOOR_Y, 6.5);
 
-fps.getObject().position.copy(BOAT_START);
+playerRig.position.copy(BOAT_START);
 
 const raycaster = new THREE.Raycaster();
 const centerPosition = new THREE.Vector2(0, 0);
@@ -249,6 +256,44 @@ function loadClassroomAssets(onComplete, onProgress) {
   });
 }
 
+// ===== XR 조이스틱 입력 =====
+let xrMoveX = 0, xrMoveZ = 0, xrSnapActive = false;
+
+function updateXRInput() {
+  const session = renderer.xr.getSession();
+  if (!session) { xrMoveX = 0; xrMoveZ = 0; return; }
+  xrMoveX = 0; xrMoveZ = 0;
+  for (const src of session.inputSources) {
+    if (!src.gamepad) continue;
+    const ax = src.gamepad.axes;
+    if (src.handedness === 'left') {
+      if (Math.abs(ax[2]) > 0.15) xrMoveX = ax[2];
+      if (Math.abs(ax[3]) > 0.15) xrMoveZ = ax[3];
+    }
+    if (src.handedness === 'right') {
+      // 우측 조이스틱: 30도 스냅 턴
+      if (Math.abs(ax[2]) > 0.7 && !xrSnapActive) {
+        playerRig.rotation.y -= Math.sign(ax[2]) * (Math.PI / 6);
+        xrSnapActive = true;
+      } else if (Math.abs(ax[2]) < 0.3) {
+        xrSnapActive = false;
+      }
+    }
+  }
+}
+
+// XR 컨트롤러 0번 트리거 → 포털 클릭
+const xrController0 = renderer.xr.getController(0);
+scene.add(xrController0);
+xrController0.addEventListener('selectstart', () => {
+  if (currentScene !== 'boat' || transitioning) return;
+  const tempMat = new THREE.Matrix4().extractRotation(xrController0.matrixWorld);
+  const xrRay   = new THREE.Raycaster();
+  xrRay.ray.origin.setFromMatrixPosition(xrController0.matrixWorld);
+  xrRay.ray.direction.set(0, 0, -1).applyMatrix4(tempMat);
+  if (xrRay.intersectObject(portalMesh, false).length > 0) switchScene('classroom');
+});
+
 // ===== 입력 =====
 const move = { forward: false, backward: false, left: false, right: false, sprint: false };
 
@@ -353,9 +398,9 @@ function switchScene(to) {
       EYE_HEIGHT = CLASSROOM_EYE_HEIGHT;
       collisionMeshes.length = 0;
       collisionMeshes.push(...classroomCollisionMeshes);
-      fps.getObject().position.copy(CLASSROOM_START);
-      fps.getObject().rotation.y = -Math.PI / 2; // 우측 90도
-      camera.rotation.x = 0;                     // 수평 시선 초기화
+      playerRig.position.copy(CLASSROOM_START);
+      playerRig.rotation.y = -Math.PI / 2;  // 우측 90도
+      camera.rotation.set(0, 0, 0);          // 수평 시선 초기화
       velocityY = 0;
 
       transitionEl.classList.remove('active');
@@ -369,7 +414,9 @@ function switchScene(to) {
       EYE_HEIGHT = BOAT_EYE_HEIGHT;
       collisionMeshes.length = 0;
       collisionMeshes.push(...boatCollisionMeshes);
-      fps.getObject().position.copy(BOAT_START);
+      playerRig.position.copy(BOAT_START);
+      playerRig.rotation.y = 0;
+      camera.rotation.set(0, 0, 0);
       velocityY = 0;
 
       transitionEl.classList.remove('active');
@@ -407,28 +454,36 @@ function checkCollision(pos) {
 
 // ===== 이동 + 벽 슬라이딩 =====
 function updateMovement(delta) {
-  if (!fps.isLocked) return;
+  const isXR = renderer.xr.isPresenting;
+  if (!isXR && !fps.isLocked) return;
 
-  const curAccel    = move.sprint ? ACCEL * SPRINT_MULTIPLIER : ACCEL;
-  const curMaxSpeed = move.sprint ? MAX_SPEED * SPRINT_MULTIPLIER : MAX_SPEED;
+  const curAccel    = (move.sprint && !isXR) ? ACCEL * SPRINT_MULTIPLIER : ACCEL;
+  const curMaxSpeed = (move.sprint && !isXR) ? MAX_SPEED * SPRINT_MULTIPLIER : MAX_SPEED;
 
-  if (move.forward)  playerVel.y += curAccel * delta;
-  if (move.backward) playerVel.y -= curAccel * delta;
-  if (move.left)     playerVel.x -= curAccel * delta;
-  if (move.right)    playerVel.x += curAccel * delta;
-  const spd = Math.sqrt(playerVel.x ** 2 + playerVel.y ** 2);
-  if (spd > curMaxSpeed) { const inv = curMaxSpeed / spd; playerVel.x *= inv; playerVel.y *= inv; }
-  playerVel.multiplyScalar(Math.exp(-FRICTION * delta));
+  if (isXR) {
+    // 조이스틱 → 직접 속도 설정
+    playerVel.x = xrMoveX * curMaxSpeed;
+    playerVel.y = -xrMoveZ * curMaxSpeed;
+  } else {
+    if (move.forward)  playerVel.y += curAccel * delta;
+    if (move.backward) playerVel.y -= curAccel * delta;
+    if (move.left)     playerVel.x -= curAccel * delta;
+    if (move.right)    playerVel.x += curAccel * delta;
+    const spd = Math.sqrt(playerVel.x ** 2 + playerVel.y ** 2);
+    if (spd > curMaxSpeed) { const inv = curMaxSpeed / spd; playerVel.x *= inv; playerVel.y *= inv; }
+    playerVel.multiplyScalar(Math.exp(-FRICTION * delta));
+  }
 
-  _rightVec.setFromMatrixColumn(camera.matrix, 0);
+  // 카메라 월드 방향 기준으로 이동 벡터 계산 (XR 헤드트래킹 + 스냅턴 모두 반영)
+  _rightVec.setFromMatrixColumn(camera.matrixWorld, 0);
   _rightVec.y = 0;
   _rightVec.normalize();
-  _forwardVec.crossVectors(fps.getObject().up, _rightVec);
+  _forwardVec.crossVectors(camera.up, _rightVec);
 
   const dx = (_rightVec.x * playerVel.x + _forwardVec.x * playerVel.y) * delta;
   const dz = (_rightVec.z * playerVel.x + _forwardVec.z * playerVel.y) * delta;
 
-  const pos  = fps.getObject().position;
+  const pos  = playerRig.position;
   const oldX = pos.x;
   const oldZ = pos.z;
 
@@ -463,19 +518,18 @@ function updateMovement(delta) {
 
 // ===== 루프 =====
 function animate() {
-  requestAnimationFrame(animate);
-
   const now   = performance.now();
   const delta = Math.min((now - _lastTime) / 1000, 0.05);
   _lastTime   = now;
 
-  if (fps.isLocked) {
+  if (fps.isLocked || renderer.xr.isPresenting) {
+    if (renderer.xr.isPresenting) updateXRInput();
     updateMovement(delta);
   } else if (orbit.enabled) {
     orbit.update();
   }
 
-  const p = fps.getObject().position;
+  const p = playerRig.position;
   coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
 
   const doorAlpha = 1 - Math.exp(-10 * delta);
@@ -493,4 +547,4 @@ function animate() {
   }
 }
 
-animate();
+renderer.setAnimationLoop(animate);

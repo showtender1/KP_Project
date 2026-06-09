@@ -195,6 +195,18 @@ button:active {
   white-space: nowrap;
 }
 
+/* ===== VR 버튼 ===== */
+#VRButton {
+  bottom: 24px !important;
+  border-radius: 10px !important;
+  font-family: 'Segoe UI', system-ui, sans-serif !important;
+  font-size: 14px !important;
+  padding: 12px 24px !important;
+  background: rgba(13,17,23,0.75) !important;
+  border: 1px solid rgba(88,166,255,0.5) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
 /* ===== 십자선 ===== */
 #crosshair {
   position: absolute;
