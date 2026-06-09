@@ -121,11 +121,7 @@ const clickHintEl  = document.getElementById('click-hint');
 const transitionEl  = document.getElementById('transition-overlay');
 const transitionMsg = document.getElementById('transition-msg');
 const transitionPct = document.getElementById('transition-pct');
-const enterBtn     = document.getElementById('enterClassroom');
-const returnBtn    = document.getElementById('returnBoat');
 const coordsEl     = document.getElementById('coords');
-const firstViewBtn = document.getElementById('firstView');
-const freeViewBtn  = document.getElementById('freeView');
 
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onLoad = () => {
@@ -358,11 +354,6 @@ function switchScene(to) {
       fps.getObject().position.copy(CLASSROOM_START);
       velocityY = 0;
 
-      enterBtn.style.display     = 'none';
-      returnBtn.style.display    = 'block';
-      firstViewBtn.style.display = 'block';
-      freeViewBtn.style.display  = 'block';
-
       transitionEl.classList.remove('active');
       setTimeout(() => { transitioning = false; clickHintEl.style.display = 'flex'; }, 320);
     }, (pct) => { transitionPct.textContent = `${pct}%`; });
@@ -377,30 +368,12 @@ function switchScene(to) {
       fps.getObject().position.copy(BOAT_START);
       velocityY = 0;
 
-      returnBtn.style.display    = 'none';
-      firstViewBtn.style.display = 'none';
-      freeViewBtn.style.display  = 'none';
-      enterBtn.style.display     = 'block';
-
       transitionEl.classList.remove('active');
       setTimeout(() => { transitioning = false; clickHintEl.style.display = 'flex'; }, 320);
     }, 600);
   }
 }
 
-enterBtn.addEventListener('click',     () => switchScene('classroom'));
-returnBtn.addEventListener('click',    () => switchScene('boat'));
-
-firstViewBtn.addEventListener('click', () => {
-  orbit.enabled = false;
-  fps.lock();
-});
-
-freeViewBtn.addEventListener('click', () => {
-  if (fps.isLocked) fps.unlock();
-  orbit.enabled = true;
-  clickHintEl.style.display = 'none';
-});
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
