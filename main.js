@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 function assetUrl(relativePath) {
   return new URL(relativePath, import.meta.url).href;
@@ -281,16 +282,79 @@ function updateXRInput() {
   }
 }
 
-// XR 컨트롤러 0번 트리거 → 포털 클릭
+// ===== XR 컨트롤러 포인터 =====
+const _xrRaycaster = new THREE.Raycaster();
+const _xrTempMat   = new THREE.Matrix4();
+
+function buildControllerRay() {
+  const pts = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -1),
+  ]);
+  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
+  const line = new THREE.Line(pts, mat);
+  line.scale.z = 5;
+  return line;
+}
+
+const controllerModelFactory = new XRControllerModelFactory();
+
 const xrController0 = renderer.xr.getController(0);
+const xrController1 = renderer.xr.getController(1);
+const ray0 = buildControllerRay();
+const ray1 = buildControllerRay();
+xrController0.add(ray0);
+xrController1.add(ray1);
 scene.add(xrController0);
+scene.add(xrController1);
+
+const grip0 = renderer.xr.getControllerGrip(0);
+const grip1 = renderer.xr.getControllerGrip(1);
+grip0.add(controllerModelFactory.createControllerModel(grip0));
+grip1.add(controllerModelFactory.createControllerModel(grip1));
+scene.add(grip0);
+scene.add(grip1);
+
+function getXRRayHit(controller) {
+  _xrTempMat.extractRotation(controller.matrixWorld);
+  _xrRaycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+  _xrRaycaster.ray.direction.set(0, 0, -1).applyMatrix4(_xrTempMat);
+  _xrRaycaster.far = 10;
+  const targets = [portalMesh, ...interactableDoors];
+  const hits = _xrRaycaster.intersectObjects(targets, true);
+  return hits.length > 0 ? hits[0] : null;
+}
+
+function updateXRPointers() {
+  for (const [ctrl, ray] of [[xrController0, ray0], [xrController1, ray1]]) {
+    const hit = getXRRayHit(ctrl);
+    if (hit) {
+      ray.material.color.setHex(0x00ff88);
+      ray.scale.z = hit.distance;
+    } else {
+      ray.material.color.setHex(0xffffff);
+      ray.scale.z = 5;
+    }
+  }
+}
+
 xrController0.addEventListener('selectstart', () => {
-  if (currentScene !== 'boat' || transitioning) return;
-  const tempMat = new THREE.Matrix4().extractRotation(xrController0.matrixWorld);
-  const xrRay   = new THREE.Raycaster();
-  xrRay.ray.origin.setFromMatrixPosition(xrController0.matrixWorld);
-  xrRay.ray.direction.set(0, 0, -1).applyMatrix4(tempMat);
-  if (xrRay.intersectObject(portalMesh, false).length > 0) switchScene('classroom');
+  if (transitioning) return;
+  const hit = getXRRayHit(xrController0);
+  if (!hit) return;
+
+  if (hit.object === portalMesh && currentScene === 'boat') {
+    switchScene('classroom');
+    return;
+  }
+
+  let obj = hit.object;
+  while (!Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen') && obj.parent) obj = obj.parent;
+  if (Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen')) {
+    obj.userData.isOpen = !obj.userData.isOpen;
+    const openAngle = obj.userData.openRotationY ?? Math.PI / 2;
+    obj.userData.targetRotation = obj.userData.isOpen ? openAngle : 0;
+  }
 });
 
 // ===== 입력 =====
@@ -528,7 +592,7 @@ function animate() {
 
   try {
     if (fps.isLocked || renderer.xr.isPresenting) {
-      if (renderer.xr.isPresenting) updateXRInput();
+      if (renderer.xr.isPresenting) { updateXRInput(); updateXRPointers(); }
       updateMovement(delta);
     } else if (orbit.enabled) {
       orbit.update();
