@@ -432,12 +432,13 @@ function checkCollision(pos) {
 function updateMovement(delta) {
   if (!fps.isLocked) return;
 
-  if (move.forward)  playerVel.y += ACCEL * delta;
-  if (move.backward) playerVel.y -= ACCEL * delta;
-  if (move.left)     playerVel.x -= ACCEL * delta;
-  if (move.right)    playerVel.x += ACCEL * delta;
-
+  const curAccel    = move.sprint ? ACCEL * SPRINT_MULTIPLIER : ACCEL;
   const curMaxSpeed = move.sprint ? MAX_SPEED * SPRINT_MULTIPLIER : MAX_SPEED;
+
+  if (move.forward)  playerVel.y += curAccel * delta;
+  if (move.backward) playerVel.y -= curAccel * delta;
+  if (move.left)     playerVel.x -= curAccel * delta;
+  if (move.right)    playerVel.x += curAccel * delta;
   const spd = Math.sqrt(playerVel.x ** 2 + playerVel.y ** 2);
   if (spd > curMaxSpeed) { const inv = curMaxSpeed / spd; playerVel.x *= inv; playerVel.y *= inv; }
   playerVel.multiplyScalar(Math.exp(-FRICTION * delta));
