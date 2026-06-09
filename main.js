@@ -505,21 +505,18 @@ function updateMovement(delta) {
     pos.x += dx; pos.z += dz;
   }
 
-  // VR: 사용자가 실제 바닥 위에 서 있으므로 중력/바닥감지 불필요
-  if (!isXR) {
-    velocityY -= GRAVITY * delta;
-    pos.y += velocityY * delta;
+  velocityY -= GRAVITY * delta;
+  pos.y += velocityY * delta;
 
-    const groundY = getGroundY(pos);
-    if (groundY > -Infinity && pos.y <= groundY) {
-      pos.y = groundY;
-      velocityY = 0;
-      canJump = true;
-    } else if (currentScene === 'classroom' && pos.y <= CLASSROOM_FLOOR_Y) {
-      pos.y = CLASSROOM_FLOOR_Y;
-      velocityY = 0;
-      canJump = true;
-    }
+  const groundY = getGroundY(pos);
+  if (groundY > -Infinity && pos.y <= groundY) {
+    pos.y = groundY;
+    velocityY = 0;
+    canJump = true;
+  } else if (currentScene === 'classroom' && pos.y <= CLASSROOM_FLOOR_Y) {
+    pos.y = CLASSROOM_FLOOR_Y;
+    velocityY = 0;
+    canJump = true;
   }
 }
 
