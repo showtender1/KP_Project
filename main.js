@@ -62,11 +62,11 @@ scene.add(fps.getObject());
 
 const BOAT_FLOOR_Y = 35.0;
 const CLASSROOM_FLOOR_Y = 1.7;
-const BOAT_EYE_HEIGHT      = 4.42; // 1.7 * 1.3 * 2
+const BOAT_EYE_HEIGHT      = 8.84; // 4.42 * 2
 const CLASSROOM_EYE_HEIGHT = 1.7;
 let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 
-const BOAT_START      = new THREE.Vector3(0, BOAT_FLOOR_Y, 0);
+const BOAT_START      = new THREE.Vector3(-0.3, 25.47, 53.14);
 const CLASSROOM_START = new THREE.Vector3(0, CLASSROOM_FLOOR_Y, 6.5);
 
 fps.getObject().position.copy(BOAT_START);
