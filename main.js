@@ -5,11 +5,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
-
-THREE.Mesh.prototype.raycast = acceleratedRaycast;
-THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
-THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 
 function assetUrl(relativePath) {
   return new URL(relativePath, import.meta.url).href;
@@ -28,8 +23,17 @@ renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.xr.enabled = true;
+renderer.xr.setFramebufferScaleFactor(0.75); // Quest 2 GPU 부하 감소
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
+
+// VR 진입 시 그림자 끄기 (모바일 GPU 과부하 방지)
+renderer.xr.addEventListener('sessionstart', () => {
+  renderer.shadowMap.enabled = false;
+});
+renderer.xr.addEventListener('sessionend', () => {
+  renderer.shadowMap.enabled = true;
+});
 
 const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
 scene.add(hemiLight);
@@ -167,7 +171,6 @@ gltfLoader.load(
       node.matrixAutoUpdate = false;
       node.updateMatrix();
       if (node.isMesh) {
-        node.geometry.computeBoundsTree();
         node.castShadow    = true;
         node.receiveShadow = true;
         boatCollisionMeshes.push(node);
@@ -211,7 +214,6 @@ function loadClassroomAssets(onComplete, onProgress) {
       node.matrixAutoUpdate = false;
       node.updateMatrix();
       if (node.isMesh) {
-        node.geometry.computeBoundsTree();
         node.castShadow    = true;
         node.receiveShadow = true;
         classroomCollisionMeshes.push(node);
@@ -522,11 +524,15 @@ function animate() {
   const delta = Math.min((now - _lastTime) / 1000, 0.05);
   _lastTime   = now;
 
-  if (fps.isLocked || renderer.xr.isPresenting) {
-    if (renderer.xr.isPresenting) updateXRInput();
-    updateMovement(delta);
-  } else if (orbit.enabled) {
-    orbit.update();
+  try {
+    if (fps.isLocked || renderer.xr.isPresenting) {
+      if (renderer.xr.isPresenting) updateXRInput();
+      updateMovement(delta);
+    } else if (orbit.enabled) {
+      orbit.update();
+    }
+  } catch (e) {
+    console.error('animate error:', e);
   }
 
   const p = playerRig.position;
