@@ -305,15 +305,15 @@ const ray0 = buildControllerRay();
 const ray1 = buildControllerRay();
 xrController0.add(ray0);
 xrController1.add(ray1);
-scene.add(xrController0);
-scene.add(xrController1);
+playerRig.add(xrController0);
+playerRig.add(xrController1);
 
 const grip0 = renderer.xr.getControllerGrip(0);
 const grip1 = renderer.xr.getControllerGrip(1);
 grip0.add(controllerModelFactory.createControllerModel(grip0));
 grip1.add(controllerModelFactory.createControllerModel(grip1));
-scene.add(grip0);
-scene.add(grip1);
+playerRig.add(grip0);
+playerRig.add(grip1);
 
 function getXRRayHit(controller) {
   _xrTempMat.extractRotation(controller.matrixWorld);
