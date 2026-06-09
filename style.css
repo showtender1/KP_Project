@@ -175,6 +175,26 @@ button:active {
   50%       { opacity: 1;   transform: translateY(-3px); }
 }
 
+/* ===== 좌표 표시 ===== */
+#coords {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  background: rgba(13, 17, 23, 0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  padding: 8px 14px;
+  border-radius: 8px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* ===== 십자선 ===== */
 #crosshair {
   position: absolute;

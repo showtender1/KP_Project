@@ -17,7 +17,7 @@ function assetUrl(relativePath) {
 let _lastTime = performance.now();
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.Perspec0xddeefftiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -62,7 +62,7 @@ scene.add(fps.getObject());
 
 const BOAT_FLOOR_Y = 35.0;
 const CLASSROOM_FLOOR_Y = 1.7;
-const BOAT_EYE_HEIGHT      = 2.21; // 1.7 * 1.3
+const BOAT_EYE_HEIGHT      = 4.42; // 1.7 * 1.3 * 2
 const CLASSROOM_EYE_HEIGHT = 1.7;
 let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 
@@ -114,6 +114,7 @@ const clickHintEl  = document.getElementById('click-hint');
 const transitionEl = document.getElementById('transition-overlay');
 const enterBtn     = document.getElementById('enterClassroom');
 const returnBtn    = document.getElementById('returnBoat');
+const coordsEl     = document.getElementById('coords');
 const firstViewBtn = document.getElementById('firstView');
 const freeViewBtn  = document.getElementById('freeView');
 
@@ -420,6 +421,9 @@ function animate() {
   } else if (orbit.enabled) {
     orbit.update();
   }
+
+  const p = fps.getObject().position;
+  coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
 
   const doorAlpha = 1 - Math.exp(-10 * delta);
   for (const door of interactableDoors) {
