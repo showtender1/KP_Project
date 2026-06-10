@@ -265,7 +265,7 @@ function loadClassroomAssets(onComplete, onProgress) {
 }
 
 // ===== XR 조이스틱 입력 =====
-let xrMoveX = 0, xrMoveZ = 0;
+let xrMoveX = 0, xrMoveZ = 0, xrSnapActive = false;
 
 function updateXRInput() {
   const session = renderer.xr.getSession();
@@ -277,6 +277,14 @@ function updateXRInput() {
     if (src.handedness === 'left') {
       if (Math.abs(ax[2]) > 0.15) xrMoveX = ax[2];
       if (Math.abs(ax[3]) > 0.15) xrMoveZ = ax[3];
+    }
+    if (src.handedness === 'right') {
+      if (Math.abs(ax[2]) > 0.7 && !xrSnapActive) {
+        playerRig.rotation.y -= Math.sign(ax[2]) * (Math.PI / 6);
+        xrSnapActive = true;
+      } else if (Math.abs(ax[2]) < 0.3) {
+        xrSnapActive = false;
+      }
     }
   }
 }
@@ -345,9 +353,9 @@ function updateXRPointers() {
   }
 }
 
-xrController0.addEventListener('selectstart', () => {
+function handleXRSelect(controller) {
   if (transitioning) return;
-  const hit = getXRRayHit(xrController0);
+  const hit = getXRRayHit(controller);
   if (!hit) return;
 
   if (hit.object === portalMesh && currentScene === 'boat') {
@@ -362,7 +370,10 @@ xrController0.addEventListener('selectstart', () => {
     const openAngle = obj.userData.openRotationY ?? Math.PI / 2;
     obj.userData.targetRotation = obj.userData.isOpen ? openAngle : 0;
   }
-});
+}
+
+xrController0.addEventListener('selectstart', () => handleXRSelect(xrController0));
+xrController1.addEventListener('selectstart', () => handleXRSelect(xrController1));
 
 // ===== 입력 =====
 const move = { forward: false, backward: false, left: false, right: false, sprint: false };
