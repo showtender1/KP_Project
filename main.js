@@ -5,7 +5,6 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 function assetUrl(relativePath) {
   return new URL(relativePath, import.meta.url).href;
@@ -286,18 +285,24 @@ function updateXRInput() {
 const _xrRaycaster = new THREE.Raycaster();
 const _xrTempMat   = new THREE.Matrix4();
 
+// 컨트롤러 레이 (얇은 실린더 — WebXR에서 Line보다 안정적)
 function buildControllerRay() {
-  const pts = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(0, 0, -1),
-  ]);
-  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
-  const line = new THREE.Line(pts, mat);
-  line.scale.z = 5;
-  return line;
+  const geom = new THREE.CylinderGeometry(0.002, 0.002, 1, 6);
+  geom.rotateX(Math.PI / 2);
+  geom.translate(0, 0, -0.5);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.scale.z = 5;
+  return mesh;
 }
 
-const controllerModelFactory = new XRControllerModelFactory();
+// 컨트롤러 몸체 (단순 박스 — 외부 CDN 없이 즉시 표시)
+function buildControllerBody() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.1), mat);
+  body.position.z = -0.03;
+  return body;
+}
 
 const xrController0 = renderer.xr.getController(0);
 const xrController1 = renderer.xr.getController(1);
@@ -310,8 +315,8 @@ playerRig.add(xrController1);
 
 const grip0 = renderer.xr.getControllerGrip(0);
 const grip1 = renderer.xr.getControllerGrip(1);
-grip0.add(controllerModelFactory.createControllerModel(grip0));
-grip1.add(controllerModelFactory.createControllerModel(grip1));
+grip0.add(buildControllerBody());
+grip1.add(buildControllerBody());
 playerRig.add(grip0);
 playerRig.add(grip1);
 
@@ -330,9 +335,11 @@ function updateXRPointers() {
     const hit = getXRRayHit(ctrl);
     if (hit) {
       ray.material.color.setHex(0x00ff88);
+      ray.scale.setScalar(1);
       ray.scale.z = hit.distance;
     } else {
       ray.material.color.setHex(0xffffff);
+      ray.scale.setScalar(1);
       ray.scale.z = 5;
     }
   }
