@@ -3,7 +3,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 
 function assetUrl(relativePath) {
@@ -62,15 +61,6 @@ roomLight2.shadow.camera.far = 15;
 roomLight2.shadow.bias = -0.001;
 scene.add(roomLight2);
 
-const pmremGenerator = new THREE.PMREMGenerator(renderer);
-pmremGenerator.compileEquirectangularShader();
-new EXRLoader().load(assetUrl('textures/autumn_field_puresky_4k.exr'), (texture) => {
-  const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-  scene.background = envMap;
-  scene.environment = envMap;
-  texture.dispose();
-  pmremGenerator.dispose();
-});
 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = false;
@@ -149,9 +139,15 @@ let _pendingLoadReveal = false;
 
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onLoad = () => {
-  // 실제 렌더 완료 후 숨기도록 플래그만 세팅
+  setLoadingProgress(100);
   _pendingLoadReveal = true;
 };
+
+new THREE.TextureLoader(loadingManager).load(assetUrl('textures/autumn_field_puresky.jpg'), (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  scene.background = texture;
+  scene.environment = texture;
+});
 
 function setLoadingProgress(pct) {
   loadingText.textContent = `로딩 중... ${pct}%`;
@@ -196,7 +192,7 @@ gltfLoader.load(
   (event) => {
     // 바이트 단위 실제 다운로드 진행률
     if (event.total > 0) {
-      setLoadingProgress(Math.round(event.loaded / event.total * 100));
+      setLoadingProgress(Math.min(99, Math.round(event.loaded / event.total * 100)));
     }
   },
   (error) => {
