@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 
 function assetUrl(relativePath) {
@@ -62,10 +62,15 @@ roomLight2.shadow.camera.far = 15;
 roomLight2.shadow.bias = -0.001;
 scene.add(roomLight2);
 
-scene.background = new THREE.Color(0x888888);
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
-scene.environment = pmremGenerator.fromScene(new RoomEnvironment()).texture;
-pmremGenerator.dispose();
+pmremGenerator.compileEquirectangularShader();
+new EXRLoader().load(assetUrl('textures/autumn_field_puresky_4k.exr'), (texture) => {
+  const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+  scene.background = envMap;
+  scene.environment = envMap;
+  texture.dispose();
+  pmremGenerator.dispose();
+});
 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = false;
