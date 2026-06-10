@@ -571,8 +571,7 @@ function updateMovement(delta) {
   const oldX = pos.x;
   const oldZ = pos.z;
 
-  if (!isXR && collisionMeshes.length > 0 && Math.abs(dx) + Math.abs(dz) > 0.0001) {
-    // 데스크톱: 벽 충돌 + 슬라이딩
+  if (collisionMeshes.length > 0 && Math.abs(dx) + Math.abs(dz) > 0.0001) {
     pos.x += dx; pos.z += dz;
 
     if (checkCollision(pos)) {
@@ -583,7 +582,6 @@ function updateMovement(delta) {
       if (checkCollision(pos)) pos.z = oldZ;
     }
   } else {
-    // VR: 벽 충돌 스킵 (레이캐스트 CPU 절감)
     pos.x += dx; pos.z += dz;
   }
 
