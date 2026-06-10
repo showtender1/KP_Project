@@ -84,7 +84,7 @@ const CLASSROOM_EYE_HEIGHT = 1.7;
 let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 
 const BOAT_START      = new THREE.Vector3(-0.3, 25.47, 53.14);
-const CLASSROOM_START = new THREE.Vector3(0, CLASSROOM_FLOOR_Y, 6.5);
+const CLASSROOM_START = new THREE.Vector3(1.71, 1.70, 5);
 
 playerRig.position.copy(BOAT_START);
 
