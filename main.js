@@ -587,7 +587,7 @@ xrController1.addEventListener('selectstart', () => handleXRSelect(xrController1
 const move = { forward: false, backward: false, left: false, right: false, sprint: false };
 
 const playerVel = new THREE.Vector2(0, 0);
-const MAX_SPEED = 7;
+const MAX_SPEED = 4.9;
 const SPRINT_MULTIPLIER = 2.0;
 const ACCEL     = 63;
 const FRICTION  = 9;
