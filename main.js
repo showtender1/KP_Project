@@ -118,6 +118,10 @@ scene.add(classroomGroup);
 let currentScene  = 'boat';
 let transitioning = false;
 
+const grabbableObjects = [];
+let heldObject     = null;
+let heldController = null;
+
 // 포털 판 (투명, 클릭 시 선박 내부로 이동)
 const portalGeom = new THREE.PlaneGeometry(5, 5);
 const portalMat  = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
@@ -226,6 +230,15 @@ function loadClassroomAssets(onComplete, onProgress) {
         classroomCollisionMeshes.push(node);
       }
     });
+    // 잡을 수 있는 오브젝트 등록
+    const GRABBABLE_NAMES = new Set(['stool_left', 'stool_right', 'book']);
+    gltf.scene.traverse((node) => {
+      if (GRABBABLE_NAMES.has(node.name)) {
+        node.userData.isGrabbable = true;
+        node.traverse(n => { n.matrixAutoUpdate = true; });
+        grabbableObjects.push(node);
+      }
+    });
     classroomGroup.add(gltf.scene);
     check();
   });
@@ -263,6 +276,40 @@ function loadClassroomAssets(onComplete, onProgress) {
     classroomGroup.add(door3);
     check();
   });
+}
+
+// ===== 오브젝트 잡기/놓기 =====
+function grabObject(obj, attachTo) {
+  if (heldObject) dropObject();
+  // 잡히는 동안 충돌에서 제외
+  obj.traverse(n => {
+    const i1 = classroomCollisionMeshes.indexOf(n);
+    if (i1 !== -1) classroomCollisionMeshes.splice(i1, 1);
+    const i2 = collisionMeshes.indexOf(n);
+    if (i2 !== -1) collisionMeshes.splice(i2, 1);
+  });
+  attachTo.attach(obj);
+  if (attachTo === camera) {
+    obj.position.set(0, -0.25, -0.7);
+  } else {
+    obj.position.set(0, 0, -0.08);
+  }
+  obj.quaternion.set(0, 0, 0, 1);
+  heldObject     = obj;
+  heldController = attachTo;
+}
+
+function dropObject() {
+  if (!heldObject) return;
+  classroomGroup.attach(heldObject);
+  heldObject.traverse(n => {
+    if (n.isMesh) {
+      classroomCollisionMeshes.push(n);
+      if (currentScene === 'classroom') collisionMeshes.push(n);
+    }
+  });
+  heldObject     = null;
+  heldController = null;
 }
 
 // ===== XR 조이스틱 입력 =====
@@ -334,7 +381,7 @@ function getXRRayHit(controller) {
   _xrRaycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   _xrRaycaster.ray.direction.set(0, 0, -1).applyMatrix4(_xrTempMat);
   _xrRaycaster.far = 10;
-  const targets = [portalMesh, ...interactableDoors];
+  const targets = [portalMesh, ...interactableDoors, ...grabbableObjects];
   const hits = _xrRaycaster.intersectObjects(targets, true);
   return hits.length > 0 ? hits[0] : null;
 }
@@ -356,8 +403,21 @@ function updateXRPointers() {
 
 function handleXRSelect(controller) {
   if (transitioning) return;
+
+  // 이미 이 컨트롤러로 잡고 있으면 놓기
+  if (heldObject && heldController === controller) { dropObject(); return; }
+
   const hit = getXRRayHit(controller);
   if (!hit) return;
+
+  // 잡기 가능 오브젝트 체크
+  let grabbable = hit.object;
+  while (grabbable && !grabbable.userData.isGrabbable) grabbable = grabbable.parent;
+  if (grabbable && grabbable.userData.isGrabbable) {
+    const grip = controller === xrController0 ? grip0 : grip1;
+    grabObject(grabbable, grip);
+    return;
+  }
 
   if (hit.object === portalMesh && currentScene === 'boat') {
     switchScene('classroom');
@@ -423,6 +483,17 @@ window.addEventListener('mousedown', (e) => {
   if (!fps.isLocked || e.button !== 0) return;
   raycaster.setFromCamera(centerPosition, camera);
 
+  // 잡기/놓기 (교실에서만)
+  if (currentScene === 'classroom') {
+    if (heldObject) { dropObject(); return; }
+    const grabHits = raycaster.intersectObjects(grabbableObjects, true);
+    if (grabHits.length > 0) {
+      let obj = grabHits[0].object;
+      while (obj && !obj.userData.isGrabbable) obj = obj.parent;
+      if (obj && obj.userData.isGrabbable) { grabObject(obj, camera); return; }
+    }
+  }
+
   // 포털 클릭 (보트 씬에서만)
   if (currentScene === 'boat' && !transitioning) {
     const portalHit = raycaster.intersectObject(portalMesh, false);
@@ -461,6 +532,7 @@ fps.addEventListener('unlock', () => {
 
 // ===== 씬 전환 =====
 function switchScene(to) {
+  if (heldObject) dropObject();
   transitioning = true;
   if (fps.isLocked) fps.unlock();
   orbit.enabled = false;
