@@ -278,16 +278,93 @@ function loadClassroomAssets(onComplete, onProgress) {
   });
 }
 
-// ===== 오브젝트 잡기/놓기 =====
-function grabObject(obj, attachTo) {
-  if (heldObject) dropObject();
-  // 잡히는 동안 충돌에서 제외
+// ===== 오브젝트 물리 =====
+const _physicsRaycaster = new THREE.Raycaster();
+const _physDown = new THREE.Vector3(0, -1, 0);
+const PHYS_GRAVITY  = 20;
+const PHYS_BOUNCE   = 0.22;
+const PHYS_FRICTION = 7;
+
+function _physAddToCollision(obj) {
+  obj.traverse(n => {
+    if (!n.isMesh) return;
+    if (!classroomCollisionMeshes.includes(n)) classroomCollisionMeshes.push(n);
+    if (currentScene === 'classroom' && !collisionMeshes.includes(n)) collisionMeshes.push(n);
+  });
+}
+
+function _physRemoveFromCollision(obj) {
   obj.traverse(n => {
     const i1 = classroomCollisionMeshes.indexOf(n);
     if (i1 !== -1) classroomCollisionMeshes.splice(i1, 1);
     const i2 = collisionMeshes.indexOf(n);
     if (i2 !== -1) collisionMeshes.splice(i2, 1);
   });
+}
+
+function updatePhysics(delta) {
+  for (const obj of grabbableObjects) {
+    if (!obj.userData.physicsActive) continue;
+
+    const vel = obj.userData.physicsVelocity;
+    const btm = obj.userData.physicsBottomOffset ?? -0.1;
+
+    vel.y -= PHYS_GRAVITY * delta;
+    obj.position.x += vel.x * delta;
+    obj.position.y += vel.y * delta;
+    obj.position.z += vel.z * delta;
+
+    // 바닥 감지: 오브젝트 하단에서 아래로 레이캐스트
+    const rayOriginY = obj.position.y + btm + 0.25;
+    _physicsRaycaster.set(
+      new THREE.Vector3(obj.position.x, rayOriginY, obj.position.z),
+      _physDown
+    );
+    _physicsRaycaster.far = 0.3 + Math.max(0, -vel.y * delta);
+    const hits = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
+
+    let landed = false;
+    if (hits.length > 0) {
+      const floorY = hits[0].point.y;
+      const objBottomY = obj.position.y + btm;
+      if (objBottomY <= floorY) {
+        obj.position.y = floorY - btm;
+        if (Math.abs(vel.y) > 1.0) {
+          vel.y = Math.abs(vel.y) * PHYS_BOUNCE;
+        } else {
+          vel.y = 0;
+          landed = true;
+        }
+        vel.x *= Math.exp(-PHYS_FRICTION * delta);
+        vel.z *= Math.exp(-PHYS_FRICTION * delta);
+      }
+    }
+
+    // 교실 바닥 안전망
+    if (obj.position.y + btm < CLASSROOM_FLOOR_Y) {
+      obj.position.y = CLASSROOM_FLOOR_Y - btm;
+      vel.y = Math.abs(vel.y) > 1.0 ? Math.abs(vel.y) * PHYS_BOUNCE : 0;
+      vel.x *= Math.exp(-PHYS_FRICTION * delta);
+      vel.z *= Math.exp(-PHYS_FRICTION * delta);
+      landed = vel.y === 0;
+    }
+
+    // 정지 판정
+    if (landed && vel.lengthSq() < 0.002) {
+      vel.set(0, 0, 0);
+      obj.userData.physicsActive = false;
+      _physAddToCollision(obj);
+    }
+
+    obj.updateMatrix();
+  }
+}
+
+// ===== 오브젝트 잡기/놓기 =====
+function grabObject(obj, attachTo) {
+  if (heldObject) dropObject();
+  obj.userData.physicsActive = false;
+  _physRemoveFromCollision(obj);
   attachTo.attach(obj);
   if (attachTo === camera) {
     obj.position.set(0, -0.25, -0.7);
@@ -301,15 +378,26 @@ function grabObject(obj, attachTo) {
 
 function dropObject() {
   if (!heldObject) return;
-  classroomGroup.attach(heldObject);
-  heldObject.traverse(n => {
-    if (n.isMesh) {
-      classroomCollisionMeshes.push(n);
-      if (currentScene === 'classroom') collisionMeshes.push(n);
-    }
-  });
-  heldObject     = null;
-  heldController = null;
+  const obj = heldObject;
+  heldObject = null; heldController = null;
+
+  classroomGroup.attach(obj);
+
+  // 오브젝트 하단 오프셋 계산
+  const box = new THREE.Box3().setFromObject(obj);
+  const wp  = new THREE.Vector3();
+  obj.getWorldPosition(wp);
+  obj.userData.physicsBottomOffset = box.min.y - wp.y;
+
+  // 투척 속도: 플레이어 이동 방향 + 위쪽
+  if (!obj.userData.physicsVelocity) obj.userData.physicsVelocity = new THREE.Vector3();
+  obj.userData.physicsVelocity.set(
+    _rightVec.x * playerVel.x + _forwardVec.x * playerVel.y,
+    0.8,
+    _rightVec.z * playerVel.x + _forwardVec.z * playerVel.y
+  );
+  obj.userData.physicsActive = true;
+  // 물리 중에는 충돌 제외 (정지 후 재등록)
 }
 
 // ===== XR 조이스틱 입력 =====
@@ -692,6 +780,8 @@ function animate() {
 
   const p = playerRig.position;
   coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
+
+  if (currentScene === 'classroom') updatePhysics(delta);
 
   const doorAlpha = 1 - Math.exp(-10 * delta);
   for (const door of interactableDoors) {
