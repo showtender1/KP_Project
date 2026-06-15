@@ -225,13 +225,13 @@ function loadClassroomAssets(onComplete, onProgress) {
       node.matrixAutoUpdate = false;
       node.updateMatrix();
       if (node.isMesh) {
-        node.castShadow    = true;
-        node.receiveShadow = true;
+        node.castShadow    = false; // 수백 개 mesh shadow 제거 → 성능 대폭 개선
+        node.receiveShadow = false;
         classroomCollisionMeshes.push(node);
       }
     });
     // 잡을 수 있는 오브젝트 등록
-    const GRABBABLE_NAMES = new Set(['stool_left', 'stool_right', 'book']);
+    const GRABBABLE_NAMES = new Set(['Stool_Left', 'Stool_Right', 'Book']);
     gltf.scene.traverse((node) => {
       if (GRABBABLE_NAMES.has(node.name)) {
         node.userData.isGrabbable = true;
