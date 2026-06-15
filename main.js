@@ -328,8 +328,41 @@ function updatePhysics(delta) {
     const btm = obj.userData.physicsBottomOffset ?? -0.1;
 
     vel.y -= PHYS_GRAVITY * delta;
+
+    // 수평 벽 충돌: 이동 전 사전 체크
+    const OBJ_R = 0.2; // 오브젝트 충돌 반경
+    const midY  = obj.position.y + btm + 0.15;
+    for (const dir of COLLISION_DIRS) {
+      const hVel = dir.x !== 0 ? vel.x : vel.z;
+      if (Math.sign(hVel) !== Math.sign(dir.x + dir.z)) continue; // 반대 방향 skip
+      _physicsRaycaster.set(new THREE.Vector3(obj.position.x, midY, obj.position.z), dir);
+      _physicsRaycaster.far = Math.abs(hVel) * delta + OBJ_R;
+      const wh = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
+      if (wh.length > 0 && wh[0].distance < OBJ_R + 0.05) {
+        // 벽에서 밀어내고 속도 반전
+        obj.position.x += dir.x * (OBJ_R - wh[0].distance + 0.01);
+        obj.position.z += dir.z * (OBJ_R - wh[0].distance + 0.01);
+        if (dir.x !== 0) vel.x = -vel.x * PHYS_BOUNCE;
+        if (dir.z !== 0) vel.z = -vel.z * PHYS_BOUNCE;
+      }
+    }
+
+    // 천장 충돌: 이동 전 사전 체크
+    if (vel.y > 0) {
+      const proposedUp = vel.y * delta;
+      _physicsRaycaster.set(new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z), _upVec);
+      _physicsRaycaster.far = proposedUp + 0.1;
+      const ch = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
+      if (ch.length > 0 && ch[0].distance <= proposedUp + 0.05) {
+        obj.position.y += Math.max(0, ch[0].distance - 0.1);
+        vel.y = -vel.y * PHYS_BOUNCE;
+      } else {
+        obj.position.y += proposedUp;
+      }
+    } else {
+      obj.position.y += vel.y * delta;
+    }
     obj.position.x += vel.x * delta;
-    obj.position.y += vel.y * delta;
     obj.position.z += vel.z * delta;
 
     // 바닥 감지: 오브젝트 하단 위쪽에서 충분히 긴 거리로 레이캐스트
@@ -764,7 +797,22 @@ function updateMovement(delta) {
   }
 
   velocityY -= GRAVITY * delta;
-  pos.y += velocityY * delta;
+  const proposedDY = velocityY * delta;
+
+  // 천장 충돌: 이동 전 사전 체크 (빠른 속도에서도 관통 방지)
+  if (proposedDY > 0 && collisionMeshes.length > 0) {
+    ceilingRaycaster.set(pos, _upVec);
+    ceilingRaycaster.far = proposedDY + 0.25;
+    const ceilHits = ceilingRaycaster.intersectObjects(collisionMeshes, false);
+    if (ceilHits.length > 0) {
+      pos.y += Math.max(0, ceilHits[0].distance - 0.25);
+      velocityY = 0;
+    } else {
+      pos.y += proposedDY;
+    }
+  } else {
+    pos.y += proposedDY;
+  }
 
   const groundY = getGroundY(pos);
   if (groundY > -Infinity && pos.y <= groundY) {
@@ -775,17 +823,6 @@ function updateMovement(delta) {
     pos.y = CLASSROOM_FLOOR_Y;
     velocityY = 0;
     canJump = true;
-  }
-
-  // 천장 충돌: 위로 이동 중일 때만 체크
-  if (velocityY > 0 && collisionMeshes.length > 0) {
-    ceilingRaycaster.set(pos, _upVec);
-    ceilingRaycaster.far = 0.3;
-    const ceilHits = ceilingRaycaster.intersectObjects(collisionMeshes, false);
-    if (ceilHits.length > 0) {
-      pos.y = ceilHits[0].point.y - 0.3;
-      velocityY = 0;
-    }
   }
 }
 
