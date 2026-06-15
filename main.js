@@ -4,6 +4,10 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 function assetUrl(relativePath) {
   return new URL(relativePath, import.meta.url).href;
@@ -27,6 +31,18 @@ renderer.xr.setFoveation(0.0);
 renderer.xr.setReferenceSpaceType('local'); // local-floor 대신 local: 카메라가 playerRig 위치에서 시작
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
+
+// EffectComposer + OutlinePass (데스크톱 호버 강조)
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const outlinePass = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera);
+outlinePass.edgeStrength   = 5.0;
+outlinePass.edgeGlow       = 0.8;
+outlinePass.edgeThickness  = 2.0;
+outlinePass.visibleEdgeColor.set('#ffff00');
+outlinePass.hiddenEdgeColor.set('#999900');
+composer.addPass(outlinePass);
+composer.addPass(new OutputPass());
 
 // VR 세션 시작: 그림자 끄기 + 포인터락 해제 + 클릭힌트 숨기기
 renderer.xr.addEventListener('sessionstart', () => {
@@ -672,6 +688,8 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  outlinePass.resolution.set(window.innerWidth, window.innerHeight);
 });
 
 // ===== 바닥 감지 (하방 레이캐스트) =====
@@ -758,6 +776,57 @@ function updateMovement(delta) {
   }
 }
 
+// ===== 호버 강조 =====
+function _findInteractableRoot(obj) {
+  let o = obj;
+  while (o) {
+    if (interactableDoors.includes(o) || grabbableObjects.includes(o)) return o;
+    o = o.parent;
+  }
+  return null;
+}
+
+const _vrHighlighted = new Set();
+
+function _setVRHighlight(obj, on) {
+  obj.traverse(n => {
+    if (!n.isMesh || !n.material || !('emissive' in n.material)) return;
+    if (!n.userData.hlMat) {
+      const cloned = n.material.clone();
+      cloned.emissive.setRGB(0.5, 0.45, 0);
+      cloned.emissiveIntensity = 1.0;
+      n.userData.hlMat  = cloned;
+      n.userData.origMat = n.material;
+    }
+    n.material = on ? n.userData.hlMat : n.userData.origMat;
+  });
+}
+
+function updateHoverHighlight() {
+  if (renderer.xr.isPresenting) {
+    for (const o of _vrHighlighted) _setVRHighlight(o, false);
+    _vrHighlighted.clear();
+    for (const ctrl of [xrController0, xrController1]) {
+      const hit = getXRRayHit(ctrl);
+      if (!hit) continue;
+      const root = _findInteractableRoot(hit.object);
+      if (root && !_vrHighlighted.has(root)) {
+        _setVRHighlight(root, true);
+        _vrHighlighted.add(root);
+      }
+    }
+  } else {
+    if (fps.isLocked) {
+      raycaster.setFromCamera(centerPosition, camera);
+      const hits = raycaster.intersectObjects([...interactableDoors, ...grabbableObjects], true);
+      const root = hits.length > 0 ? _findInteractableRoot(hits[0].object) : null;
+      outlinePass.selectedObjects = root ? [root] : [];
+    } else {
+      outlinePass.selectedObjects = [];
+    }
+  }
+}
+
 // ===== 루프 =====
 function animate() {
   const now   = performance.now();
@@ -785,7 +854,13 @@ function animate() {
     door.rotation.y = THREE.MathUtils.lerp(door.rotation.y, door.userData.targetRotation, doorAlpha);
   }
 
-  renderer.render(scene, camera);
+  updateHoverHighlight();
+
+  if (renderer.xr.isPresenting) {
+    renderer.render(scene, camera);
+  } else {
+    composer.render();
+  }
 
   // 렌더가 실제로 끝난 직후 로딩 화면 제거
   if (_pendingLoadReveal) {
