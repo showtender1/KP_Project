@@ -329,19 +329,25 @@ function updatePhysics(delta) {
 
     vel.y -= PHYS_GRAVITY * delta;
 
-    // 수평 벽 충돌: 이동 전 사전 체크
-    const OBJ_R = 0.2; // 오브젝트 충돌 반경
-    const midY  = obj.position.y + btm + 0.15;
+    // 수평 벽 충돌: 이동 전 사전 체크 (하/중/상 3개 높이 레이캐스트)
+    const OBJ_R = 0.25;
+    const baseY = obj.position.y + btm;
+    const rayHeights = [baseY + 0.05, baseY + 0.2, baseY + 0.4];
     for (const dir of COLLISION_DIRS) {
       const hVel = dir.x !== 0 ? vel.x : vel.z;
-      if (Math.sign(hVel) !== Math.sign(dir.x + dir.z)) continue; // 반대 방향 skip
-      _physicsRaycaster.set(new THREE.Vector3(obj.position.x, midY, obj.position.z), dir);
-      _physicsRaycaster.far = Math.abs(hVel) * delta + OBJ_R;
-      const wh = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
-      if (wh.length > 0 && wh[0].distance < OBJ_R + 0.05) {
-        // 벽에서 밀어내고 속도 반전
-        obj.position.x += dir.x * (OBJ_R - wh[0].distance + 0.01);
-        obj.position.z += dir.z * (OBJ_R - wh[0].distance + 0.01);
+      if (Math.sign(hVel) !== Math.sign(dir.x + dir.z)) continue;
+      let minDist = Infinity;
+      const castFar = Math.abs(hVel) * delta + OBJ_R + 0.1;
+      for (const ry of rayHeights) {
+        _physicsRaycaster.set(new THREE.Vector3(obj.position.x, ry, obj.position.z), dir);
+        _physicsRaycaster.far = castFar;
+        const wh = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
+        if (wh.length > 0 && wh[0].distance < minDist) minDist = wh[0].distance;
+      }
+      if (minDist < OBJ_R + 0.05) {
+        // 벽 반대 방향으로 밀어냄 (부호: -=)
+        obj.position.x -= dir.x * (OBJ_R - minDist + 0.01);
+        obj.position.z -= dir.z * (OBJ_R - minDist + 0.01);
         if (dir.x !== 0) vel.x = -vel.x * PHYS_BOUNCE;
         if (dir.z !== 0) vel.z = -vel.z * PHYS_BOUNCE;
       }
