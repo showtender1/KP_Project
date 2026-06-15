@@ -314,22 +314,21 @@ function updatePhysics(delta) {
     obj.position.y += vel.y * delta;
     obj.position.z += vel.z * delta;
 
-    // 바닥 감지: 오브젝트 하단에서 아래로 레이캐스트
-    const rayOriginY = obj.position.y + btm + 0.25;
+    // 바닥 감지: 오브젝트 하단 위쪽에서 충분히 긴 거리로 레이캐스트
+    const objBottomY = obj.position.y + btm;
     _physicsRaycaster.set(
-      new THREE.Vector3(obj.position.x, rayOriginY, obj.position.z),
+      new THREE.Vector3(obj.position.x, objBottomY + 0.3, obj.position.z),
       _physDown
     );
-    _physicsRaycaster.far = 0.3 + Math.max(0, -vel.y * delta);
+    _physicsRaycaster.far = 5.0; // 방 전체 높이 커버
     const hits = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
 
     let landed = false;
     if (hits.length > 0) {
       const floorY = hits[0].point.y;
-      const objBottomY = obj.position.y + btm;
-      if (objBottomY <= floorY) {
+      if (objBottomY <= floorY + 0.02) {
         obj.position.y = floorY - btm;
-        if (Math.abs(vel.y) > 1.0) {
+        if (Math.abs(vel.y) > 1.2) {
           vel.y = Math.abs(vel.y) * PHYS_BOUNCE;
         } else {
           vel.y = 0;
@@ -340,13 +339,11 @@ function updatePhysics(delta) {
       }
     }
 
-    // 교실 바닥 안전망
-    if (obj.position.y + btm < CLASSROOM_FLOOR_Y) {
-      obj.position.y = CLASSROOM_FLOOR_Y - btm;
-      vel.y = Math.abs(vel.y) > 1.0 ? Math.abs(vel.y) * PHYS_BOUNCE : 0;
-      vel.x *= Math.exp(-PHYS_FRICTION * delta);
-      vel.z *= Math.exp(-PHYS_FRICTION * delta);
-      landed = vel.y === 0;
+    // 절대 안전망 (실제 교실 바닥 Y ≈ 0, CLASSROOM_FLOOR_Y는 플레이어 눈높이라 사용 금지)
+    if (objBottomY < -0.5) {
+      obj.position.y = -0.5 - btm;
+      vel.set(0, 0, 0);
+      landed = true;
     }
 
     // 정지 판정
