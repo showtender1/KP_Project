@@ -550,8 +550,13 @@ function handleXRSelect(controller) {
   let grabbable = hit.object;
   while (grabbable && !grabbable.userData.isGrabbable) grabbable = grabbable.parent;
   if (grabbable && grabbable.userData.isGrabbable) {
-    const grip = controller === xrController0 ? grip0 : grip1;
-    grabObject(grabbable, grip);
+    // 벽 차단 체크: 컨트롤러→오브젝트 사이에 벽이 있으면 잡기 불가
+    _xrRaycaster.far = hit.distance - 0.05;
+    const wallBlocked = _xrRaycaster.intersectObjects(collisionMeshes, false).length > 0;
+    if (!wallBlocked) {
+      const grip = controller === xrController0 ? grip0 : grip1;
+      grabObject(grabbable, grip);
+    }
     return;
   }
 
@@ -624,9 +629,13 @@ window.addEventListener('mousedown', (e) => {
     if (heldObject) { dropObject(); return; }
     const grabHits = raycaster.intersectObjects(grabbableObjects, true);
     if (grabHits.length > 0) {
-      let obj = grabHits[0].object;
-      while (obj && !obj.userData.isGrabbable) obj = obj.parent;
-      if (obj && obj.userData.isGrabbable) { grabObject(obj, camera); return; }
+      const wallHits = raycaster.intersectObjects(collisionMeshes, false);
+      const blocked  = wallHits.length > 0 && wallHits[0].distance < grabHits[0].distance - 0.05;
+      if (!blocked) {
+        let obj = grabHits[0].object;
+        while (obj && !obj.userData.isGrabbable) obj = obj.parent;
+        if (obj && obj.userData.isGrabbable) { grabObject(obj, camera); return; }
+      }
     }
   }
 
@@ -859,6 +868,9 @@ function updateHoverHighlight() {
     for (const ctrl of [xrController0, xrController1]) {
       const hit = getXRRayHit(ctrl);
       if (!hit) continue;
+      // 벽 차단 체크
+      _xrRaycaster.far = hit.distance - 0.05;
+      if (_xrRaycaster.intersectObjects(collisionMeshes, false).length > 0) continue;
       const root = _findInteractableRoot(hit.object);
       if (root && !_vrHighlighted.has(root)) {
         _setVRHighlight(root, true);
@@ -869,7 +881,12 @@ function updateHoverHighlight() {
     if (fps.isLocked) {
       raycaster.setFromCamera(centerPosition, camera);
       const hits = raycaster.intersectObjects([...interactableDoors, ...grabbableObjects], true);
-      const root = hits.length > 0 ? _findInteractableRoot(hits[0].object) : null;
+      let root = null;
+      if (hits.length > 0) {
+        const wallHits = raycaster.intersectObjects(collisionMeshes, false);
+        const blocked  = wallHits.length > 0 && wallHits[0].distance < hits[0].distance - 0.05;
+        if (!blocked) root = _findInteractableRoot(hits[0].object);
+      }
       outlinePass.selectedObjects = root ? [root] : [];
     } else {
       outlinePass.selectedObjects = [];
