@@ -122,7 +122,9 @@ const _rightVec     = new THREE.Vector3();
 const _forwardVec   = new THREE.Vector3();
 const _groundOrigin = new THREE.Vector3();
 const _downVec      = new THREE.Vector3(0, -1, 0);
-const groundRaycaster = new THREE.Raycaster();
+const _upVec        = new THREE.Vector3(0,  1, 0);
+const groundRaycaster   = new THREE.Raycaster();
+const ceilingRaycaster  = new THREE.Raycaster();
 
 // 씬 그룹
 const boatGroup      = new THREE.Group();
@@ -773,6 +775,17 @@ function updateMovement(delta) {
     pos.y = CLASSROOM_FLOOR_Y;
     velocityY = 0;
     canJump = true;
+  }
+
+  // 천장 충돌: 위로 이동 중일 때만 체크
+  if (velocityY > 0 && collisionMeshes.length > 0) {
+    ceilingRaycaster.set(pos, _upVec);
+    ceilingRaycaster.far = 0.3;
+    const ceilHits = ceilingRaycaster.intersectObjects(collisionMeshes, false);
+    if (ceilHits.length > 0) {
+      pos.y = ceilHits[0].point.y - 0.3;
+      velocityY = 0;
+    }
   }
 }
 
