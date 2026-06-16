@@ -583,6 +583,20 @@ function updateXRPointers() {
   }
 }
 
+
+function _toggleDoor(door) {
+  door.userData.isOpen = !door.userData.isOpen;
+  const open = door.userData.openRotationY ?? Math.PI / 2;
+  const closed = door.userData.closedRotation ?? 0;
+  door.userData.targetRotation = door.userData.isOpen ? open : closed;
+  const linked = door.userData.linkedDoor;
+  if (linked) {
+    linked.userData.isOpen = door.userData.isOpen;
+    linked.userData.targetRotation = door.userData.isOpen
+      ? (linked.userData.openRotationY ?? Math.PI / 2)
+      : (linked.userData.closedRotation ?? 0);
+  }
+}
 function handleXRSelect(controller) {
   if (transitioning) return;
 
