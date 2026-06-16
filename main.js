@@ -261,6 +261,7 @@ function loadClassroomAssets(onComplete, onProgress) {
 
       // 잡을 수 있는 오브젝트 / Kit 도어 등록
       const GRABBABLE_NAMES = new Set(['Stool_Left', 'Stool_Right', 'Book']);
+      const kitDoorPair = [];
       gltf.scene.traverse((node) => {
         if (GRABBABLE_NAMES.has(node.name)) {
           node.userData.isGrabbable = true;
@@ -268,13 +269,24 @@ function loadClassroomAssets(onComplete, onProgress) {
           grabbableObjects.push(node);
         }
         if (KIT_DOOR_NAMES.has(node.name)) {
+          const closedRot = node.rotation.y - Math.PI / 2; // 왼쪽 90도 회전한 위치가 닫힌 상태
+          node.rotation.y = closedRot;
           node.userData.isOpen = false;
-          node.userData.openRotationY = Math.PI / 2;
-          node.userData.targetRotation = 0;
+          node.userData.closedRotation = closedRot;
+          node.userData.openRotationY = node.name === 'Kit_Door_Right'
+            ? closedRot + Math.PI / 2   // Right: 오른쪽으로 90도
+            : closedRot - Math.PI / 2;  // Left: 왼쪽으로 90도
+          node.userData.targetRotation = closedRot;
           node.traverse(n => { n.matrixAutoUpdate = true; n.castShadow = true; n.receiveShadow = true; });
           interactableDoors.push(node);
+          kitDoorPair.push(node);
         }
       });
+      // 두 Kit 도어 연결 — 한 쪽 클릭 시 양쪽 동시 작동
+      if (kitDoorPair.length === 2) {
+        kitDoorPair[0].userData.linkedDoor = kitDoorPair[1];
+        kitDoorPair[1].userData.linkedDoor = kitDoorPair[0];
+      }
 
       classroomGroup.add(gltf.scene);
     } catch (e) {
@@ -607,7 +619,12 @@ function handleXRSelect(controller) {
   if (Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen')) {
     obj.userData.isOpen = !obj.userData.isOpen;
     const openAngle = obj.userData.openRotationY ?? Math.PI / 2;
-    obj.userData.targetRotation = obj.userData.isOpen ? openAngle : 0;
+    obj.userData.targetRotation = obj.userData.isOpen ? openAngle : (obj.userData.closedRotation ?? 0);
+    const linked = obj.userData.linkedDoor;
+    if (linked) {
+      linked.userData.isOpen = obj.userData.isOpen;
+      linked.userData.targetRotation = linked.userData.isOpen ? (linked.userData.openRotationY ?? Math.PI / 2) : (linked.userData.closedRotation ?? 0);
+    }
   }
 }
 
@@ -691,7 +708,12 @@ window.addEventListener('mousedown', (e) => {
     if (Object.prototype.hasOwnProperty.call(clicked.userData, 'isOpen')) {
       clicked.userData.isOpen = !clicked.userData.isOpen;
       const openAngle = clicked.userData.openRotationY ?? Math.PI / 2;
-      clicked.userData.targetRotation = clicked.userData.isOpen ? openAngle : 0;
+      clicked.userData.targetRotation = clicked.userData.isOpen ? openAngle : (clicked.userData.closedRotation ?? 0);
+      const linked = clicked.userData.linkedDoor;
+      if (linked) {
+        linked.userData.isOpen = clicked.userData.isOpen;
+        linked.userData.targetRotation = linked.userData.isOpen ? (linked.userData.openRotationY ?? Math.PI / 2) : (linked.userData.closedRotation ?? 0);
+      }
     }
   }
 });
