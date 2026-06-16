@@ -239,7 +239,6 @@ function loadClassroomAssets(onComplete, onProgress) {
 
   classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
     try {
-      transitionPct.style.display = 'block';
       gltf.scene.position.set(2.7, -0.02, 4.83);
 
       // Kit 도어 메시를 충돌 배열에서 제외하기 위해 먼저 수집
@@ -283,6 +282,7 @@ function loadClassroomAssets(onComplete, onProgress) {
         }
       });
       // 두 Kit 도어 연결 — 한 쪽 클릭 시 양쪽 동시 작동
+      console.log('[KitDoor] 발견된 도어 수:', kitDoorPair.length, kitDoorPair.map(n => n.name));
       if (kitDoorPair.length === 2) {
         kitDoorPair[0].userData.linkedDoor = kitDoorPair[1];
         kitDoorPair[1].userData.linkedDoor = kitDoorPair[0];
@@ -293,13 +293,7 @@ function loadClassroomAssets(onComplete, onProgress) {
       console.error('classroom.glb 처리 오류:', e);
     }
     check();
-  }, (event) => {
-    if (event.loaded > 0) {
-      const mb = (event.loaded / 1024 / 1024).toFixed(0);
-      const total = event.total > 0 ? `/ ${(event.total / 1024 / 1024).toFixed(0)}MB` : '';
-      transitionMsg.textContent = `교실 모델 다운로드 중... ${mb}MB ${total}`;
-    }
-  }, (err) => {
+  }, undefined, (err) => {
     console.error('classroom.glb 로드 실패:', err);
     check();
   });
