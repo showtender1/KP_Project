@@ -587,7 +587,7 @@ xrController1.addEventListener('selectstart', () => handleXRSelect(xrController1
 const move = { forward: false, backward: false, left: false, right: false, sprint: false };
 
 const playerVel = new THREE.Vector2(0, 0);
-const MAX_SPEED = 4.9;
+const MAX_SPEED = 7;
 const SPRINT_MULTIPLIER = 2.0;
 const ACCEL     = 63;
 const FRICTION  = 9;
@@ -768,7 +768,8 @@ function updateMovement(delta) {
   if (!isXR && !fps.isLocked) return;
 
   const curAccel    = (move.sprint && !isXR) ? ACCEL * SPRINT_MULTIPLIER : ACCEL;
-  const curMaxSpeed = (move.sprint && !isXR) ? MAX_SPEED * SPRINT_MULTIPLIER : MAX_SPEED;
+  const sceneSpeed  = currentScene === 'classroom' ? MAX_SPEED * 0.7 : MAX_SPEED;
+  const curMaxSpeed = (move.sprint && !isXR) ? sceneSpeed * SPRINT_MULTIPLIER : sceneSpeed;
 
   if (isXR) {
     // 조이스틱 → 직접 속도 설정
