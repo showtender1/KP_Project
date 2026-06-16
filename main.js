@@ -239,6 +239,7 @@ function loadClassroomAssets(onComplete, onProgress) {
 
   classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
     try {
+      transitionPct.style.display = 'block';
       gltf.scene.position.set(2.7, -0.02, 4.83);
 
       // Kit 도어 메시를 충돌 배열에서 제외하기 위해 먼저 수집
@@ -268,9 +269,7 @@ function loadClassroomAssets(onComplete, onProgress) {
           grabbableObjects.push(node);
         }
         if (KIT_DOOR_NAMES.has(node.name)) {
-          const closedRot = node.name === 'Kit_Door_Left'
-            ? node.rotation.y + Math.PI / 2   // Left: 오른쪽으로 90도
-            : node.rotation.y - Math.PI / 2;  // Right: 왼쪽으로 90도
+          const closedRot = node.rotation.y - Math.PI / 2; // 왼쪽 90도 회전한 위치가 닫힌 상태
           node.rotation.y = closedRot;
           node.userData.isOpen = false;
           node.userData.closedRotation = closedRot;
@@ -294,7 +293,13 @@ function loadClassroomAssets(onComplete, onProgress) {
       console.error('classroom.glb 처리 오류:', e);
     }
     check();
-  }, undefined, (err) => {
+  }, (event) => {
+    if (event.loaded > 0) {
+      const mb = (event.loaded / 1024 / 1024).toFixed(0);
+      const total = event.total > 0 ? `/ ${(event.total / 1024 / 1024).toFixed(0)}MB` : '';
+      transitionMsg.textContent = `교실 모델 다운로드 중... ${mb}MB ${total}`;
+    }
+  }, (err) => {
     console.error('classroom.glb 로드 실패:', err);
     check();
   });
@@ -614,12 +619,7 @@ function handleXRSelect(controller) {
   if (Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen')) {
     obj.userData.isOpen = !obj.userData.isOpen;
     const openAngle = obj.userData.openRotationY ?? Math.PI / 2;
-    obj.userData.targetRotation = obj.userData.isOpen ? openAngle : (obj.userData.closedRotation ?? 0);
-    const linked = obj.userData.linkedDoor;
-    if (linked) {
-      linked.userData.isOpen = obj.userData.isOpen;
-      linked.userData.targetRotation = linked.userData.isOpen ? (linked.userData.openRotationY ?? Math.PI / 2) : (linked.userData.closedRotation ?? 0);
-    }
+    obj.userData.targetRotation = obj.userData.isOpen ? openAngle : 0;
   }
 }
 
@@ -703,12 +703,7 @@ window.addEventListener('mousedown', (e) => {
     if (Object.prototype.hasOwnProperty.call(clicked.userData, 'isOpen')) {
       clicked.userData.isOpen = !clicked.userData.isOpen;
       const openAngle = clicked.userData.openRotationY ?? Math.PI / 2;
-      clicked.userData.targetRotation = clicked.userData.isOpen ? openAngle : (clicked.userData.closedRotation ?? 0);
-      const linked = clicked.userData.linkedDoor;
-      if (linked) {
-        linked.userData.isOpen = clicked.userData.isOpen;
-        linked.userData.targetRotation = linked.userData.isOpen ? (linked.userData.openRotationY ?? Math.PI / 2) : (linked.userData.closedRotation ?? 0);
-      }
+      clicked.userData.targetRotation = clicked.userData.isOpen ? openAngle : 0;
     }
   }
 });
@@ -941,6 +936,7 @@ function updateHoverHighlight() {
         const wallHits = raycaster.intersectObjects(collisionMeshes, false);
         const blocked  = wallHits.length > 0 && wallHits[0].distance < hits[0].distance - 0.05;
         if (!blocked) root = _findInteractableRoot(hits[0].object);
+        
       }
       outlinePass.selectedObjects = root ? [root] : [];
     } else {
