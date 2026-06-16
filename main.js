@@ -628,9 +628,9 @@ function handleXRSelect(controller) {
   let obj = hit.object;
   while (!Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen') && obj.parent) obj = obj.parent;
   if (Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen')) {
-    obj.userData.isOpen = !obj.userData.isOpen;
-    const openAngle = obj.userData.openRotationY ?? Math.PI / 2;
-    obj.userData.targetRotation = obj.userData.isOpen ? openAngle : 0;
+    _toggleDoor(obj);
+
+
   }
 }
 
@@ -712,9 +712,9 @@ window.addEventListener('mousedown', (e) => {
       clicked = clicked.parent;
     }
     if (Object.prototype.hasOwnProperty.call(clicked.userData, 'isOpen')) {
-      clicked.userData.isOpen = !clicked.userData.isOpen;
-      const openAngle = clicked.userData.openRotationY ?? Math.PI / 2;
-      clicked.userData.targetRotation = clicked.userData.isOpen ? openAngle : 0;
+      _toggleDoor(clicked);
+
+
     }
   }
 });
