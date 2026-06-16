@@ -153,8 +153,8 @@ const loadingText  = document.getElementById('loading-text');
 const loadingBar   = document.getElementById('loading-bar');
 const clickHintEl  = document.getElementById('click-hint');
 const transitionEl  = document.getElementById('transition-overlay');
-const transitionMsg = document.getElementById('transition-msg');
 const transitionPct = document.getElementById('transition-pct');
+const transitionBar  = document.getElementById('transition-bar');
 const coordsEl     = document.getElementById('coords');
 
 let _pendingLoadReveal = false;
@@ -239,7 +239,6 @@ function loadClassroomAssets(onComplete, onProgress) {
 
   classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
     try {
-      transitionPct.style.display = 'block';
       gltf.scene.position.set(2.7, -0.02, 4.83);
 
       // Kit 도어 메시를 충돌 배열에서 제외하기 위해 먼저 수집
@@ -296,7 +295,6 @@ function loadClassroomAssets(onComplete, onProgress) {
     if (event.loaded > 0) {
       const mb = (event.loaded / 1024 / 1024).toFixed(0);
       const total = event.total > 0 ? `/ ${(event.total / 1024 / 1024).toFixed(0)}MB` : '';
-      transitionMsg.textContent = `교실 모델 다운로드 중... ${mb}MB ${total}`;
     }
   }, (err) => {
     console.error('classroom.glb 로드 실패:', err);
@@ -734,14 +732,9 @@ function switchScene(to) {
   transitionEl.classList.add('active');
 
   if (to === 'classroom') {
-    transitionMsg.textContent = '학교 모델 로딩 중...';
     if (!classroomReady) {
-      transitionPct.style.display = 'block';
-      transitionPct.textContent   = '0%';
     }
     loadClassroomAssets(() => {
-      transitionPct.style.display = 'none';
-      transitionMsg.textContent   = '학교 모델 로딩 중...';
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       currentScene = 'classroom';
@@ -755,7 +748,7 @@ function switchScene(to) {
 
       transitionEl.classList.remove('active');
       setTimeout(() => { transitioning = false; clickHintEl.style.display = 'flex'; }, 320);
-    }, (pct) => { transitionPct.textContent = `${pct}%`; });
+    }, (pct) => { transitionBar.style.width = pct + '%'; transitionPct.textContent = pct + '%'; });
   } else {
     setTimeout(() => {
       classroomGroup.visible = false;
