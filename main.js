@@ -269,10 +269,7 @@ function loadClassroomAssets(onComplete, onProgress) {
           grabbableObjects.push(node);
         }
         if (KIT_DOOR_NAMES.has(node.name)) {
-          const closedRot = node.name === 'Kit_Door_Left'
-            ? node.rotation.y - Math.PI / 2   // Left: 오른쪽으로 90도
-            : node.rotation.y - Math.PI / 4;  // Right: 45도
-          node.rotation.y = closedRot;
+          const closedRot = node.rotation.y; // GLB 원래 위치
           node.userData.isOpen = false;
           node.userData.closedRotation = closedRot;
           node.userData.openRotationY = node.name === 'Kit_Door_Right'
@@ -737,14 +734,14 @@ function switchScene(to) {
   transitionEl.classList.add('active');
 
   if (to === 'classroom') {
-    transitionMsg.textContent = '선박 내부로 이동 중...';
+    transitionMsg.textContent = '학교 모델 로딩 중...';
     if (!classroomReady) {
       transitionPct.style.display = 'block';
       transitionPct.textContent   = '0%';
     }
     loadClassroomAssets(() => {
       transitionPct.style.display = 'none';
-      transitionMsg.textContent   = '이동 중...';
+      transitionMsg.textContent   = '학교 모델 로딩 중...';
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       currentScene = 'classroom';
