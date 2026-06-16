@@ -239,16 +239,25 @@ function loadClassroomAssets(onComplete, onProgress) {
 
   classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
     gltf.scene.position.set(2.7, -0.02, 4.83);
+
+    // Kit 도어 메시를 충돌 배열에서 제외하기 위해 먼저 수집
+    const KIT_DOOR_NAMES = new Set(['Kit_Door_Left', 'Kit_Door_Right']);
+    const kitDoorMeshes = new Set();
+    gltf.scene.traverse((node) => {
+      if (KIT_DOOR_NAMES.has(node.name)) node.traverse(n => kitDoorMeshes.add(n));
+    });
+
     gltf.scene.traverse((node) => {
       node.matrixAutoUpdate = false;
       node.updateMatrix();
-      if (node.isMesh) {
-        node.castShadow    = false; // 수백 개 mesh shadow 제거 → 성능 대폭 개선
+      if (node.isMesh && !kitDoorMeshes.has(node)) {
+        node.castShadow    = false;
         node.receiveShadow = false;
         classroomCollisionMeshes.push(node);
       }
     });
-    // 잡을 수 있는 오브젝트 등록
+
+    // 잡을 수 있는 오브젝트 / Kit 도어 등록
     const GRABBABLE_NAMES = new Set(['Stool_Left', 'Stool_Right', 'Book']);
     gltf.scene.traverse((node) => {
       if (GRABBABLE_NAMES.has(node.name)) {
@@ -256,7 +265,15 @@ function loadClassroomAssets(onComplete, onProgress) {
         node.traverse(n => { n.matrixAutoUpdate = true; });
         grabbableObjects.push(node);
       }
+      if (KIT_DOOR_NAMES.has(node.name)) {
+        node.userData.isOpen = false;
+        node.userData.openRotationY = Math.PI / 2;
+        node.userData.targetRotation = 0;
+        node.traverse(n => { n.matrixAutoUpdate = true; n.castShadow = true; n.receiveShadow = true; });
+        interactableDoors.push(node);
+      }
     });
+
     classroomGroup.add(gltf.scene);
     check();
   });
