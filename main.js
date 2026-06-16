@@ -284,7 +284,6 @@ function loadClassroomAssets(onComplete, onProgress) {
         }
       });
       // 두 Kit 도어 연결 — 한 쪽 클릭 시 양쪽 동시 작동
-      console.log('[KitDoor] 발견된 도어 수:', kitDoorPair.length, kitDoorPair.map(n => n.name));
       if (kitDoorPair.length === 2) {
         kitDoorPair[0].userData.linkedDoor = kitDoorPair[1];
         kitDoorPair[1].userData.linkedDoor = kitDoorPair[0];
