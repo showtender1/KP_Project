@@ -268,7 +268,9 @@ function loadClassroomAssets(onComplete, onProgress) {
           grabbableObjects.push(node);
         }
         if (KIT_DOOR_NAMES.has(node.name)) {
-          const closedRot = node.rotation.y - Math.PI / 2; // 왼쪽 90도 회전한 위치가 닫힌 상태
+          const closedRot = node.name === 'Kit_Door_Left'
+            ? node.rotation.y + Math.PI / 2   // Left: 오른쪽으로 90도
+            : node.rotation.y - Math.PI / 2;  // Right: 왼쪽으로 90도
           node.rotation.y = closedRot;
           node.userData.isOpen = false;
           node.userData.closedRotation = closedRot;
