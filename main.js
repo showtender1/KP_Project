@@ -167,6 +167,7 @@ const classroomCollisionMeshes = [];
 const collisionMeshes          = [];
 const collisionRaycaster = new THREE.Raycaster();
 collisionRaycaster.far = PLAYER_RADIUS + 0.2;
+collisionRaycaster.firstHitOnly = true;
 
 const COLLISION_DIRS = [
   new THREE.Vector3( 1, 0,  0),
@@ -181,7 +182,9 @@ const _groundOrigin = new THREE.Vector3();
 const _downVec      = new THREE.Vector3(0, -1, 0);
 const _upVec        = new THREE.Vector3(0,  1, 0);
 const groundRaycaster   = new THREE.Raycaster();
+groundRaycaster.firstHitOnly = true;
 const ceilingRaycaster  = new THREE.Raycaster();
+ceilingRaycaster.firstHitOnly = true;
 
 // 씬 그룹
 const boatGroup      = new THREE.Group();
@@ -251,6 +254,8 @@ let _boatEntryPopupTimer = null;
 
 let _pendingLoadReveal = false;
 let _hoverTick = 0;
+let _hoverTargets = [];
+function _rebuildHoverTargets() { _hoverTargets = [...interactableDoors, ...grabbableObjects]; }
 
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onLoad = () => {
@@ -341,6 +346,11 @@ function loadClassroomAssets(onComplete, onProgress) {
       gltf.scene.traverse((node) => {
         if (KIT_DOOR_NAMES.has(node.name)) node.traverse(n => kitDoorMeshes.add(n));
       });
+      // grabbable 오브젝트도 충돌 배열에서 제외 (이동 가능 오브젝트는 불필요)
+      const _GRAB_TMP = new Set(['Stool_Left','Stool_Right','Book','chair1','chair2','chair3','Cousion1','Cousion2','Cousion3','Dish','Jigger1','Jigger2','Kit_Bottle','Kit_Chair','Bar_Chair_1','Bar_Chair_2','Bar_Chair_3','Bar_Chair_4','Bar_Chair_5','Bar_Chair_6','Bar_Chair_7','Bar_Chair_8','Cacktale','Ice_Can','RH_Highball','RH_RoundDecanter','Wine','Wine_Met']);
+      gltf.scene.traverse((node) => {
+        if (_GRAB_TMP.has(node.name)) node.traverse(n => kitDoorMeshes.add(n));
+      });
 
       gltf.scene.traverse((node) => {
         node.matrixAutoUpdate = false;
@@ -384,6 +394,7 @@ function loadClassroomAssets(onComplete, onProgress) {
 
       classroomGroup.add(gltf.scene);
       if (!dartboardMesh) initDartGame();
+      _rebuildHoverTargets();
     } catch (e) {
       console.error('classroom.glb 처리 오류:', e);
     }
@@ -435,6 +446,7 @@ function loadClassroomAssets(onComplete, onProgress) {
 
 // ===== 오브젝트 물리 =====
 const _physicsRaycaster = new THREE.Raycaster();
+_physicsRaycaster.firstHitOnly = true;
 const _physDown = new THREE.Vector3(0, -1, 0);
 const PHYS_GRAVITY  = 20;
 const PHYS_BOUNCE   = 0.22;
@@ -1187,7 +1199,7 @@ function updateHoverHighlight() {
   } else {
     if (fps.isLocked) {
       raycaster.setFromCamera(centerPosition, camera);
-      const hits = raycaster.intersectObjects([...interactableDoors, ...grabbableObjects], true);
+      const hits = raycaster.intersectObjects(_hoverTargets, true);
       let root = null;
       if (hits.length > 0) {
         const wallHits = raycaster.intersectObjects(collisionMeshes, false);
