@@ -94,7 +94,7 @@ roomLight4.target.position.set(6.55, 0, 8.42);
 scene.add(roomLight4);
 scene.add(roomLight4.target);
 
-const roomLight5 = new THREE.SpotLight(0xfff5e0, 12.0, 12, Math.PI/2.5, 0.25);
+const roomLight5 = new THREE.SpotLight(0xfff5e0, 7.8, 12, Math.PI/2.5, 0.25);
 roomLight5.position.set(9.6, 2.2, 4.7);
 roomLight5.target.position.set(9.6, 0, 4.7);
 roomLight5.castShadow = true;
@@ -105,7 +105,7 @@ roomLight5.shadow.bias = -0.001;
 scene.add(roomLight5);
 scene.add(roomLight5.target);
 
-const roomLight6 = new THREE.SpotLight(0xfff5e0, 12.0, 12, Math.PI/2.5, 0.25);
+const roomLight6 = new THREE.SpotLight(0xfff5e0, 7.8, 12, Math.PI/2.5, 0.25);
 roomLight6.position.set(-2.64, 2.2, 4.94);
 roomLight6.target.position.set(-2.64, 0, 4.94);
 scene.add(roomLight6);
