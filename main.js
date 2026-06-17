@@ -61,19 +61,19 @@ scene.add(hemiLight);
 
 const roomLight1 = new THREE.PointLight(0xfff5e0, 6.0, 220);
 roomLight1.position.set(0, 2.1, 1.18);
-roomLight1.castShadow = false;
-roomLight1.shadow.mapSize.set(512, 512);
+roomLight1.castShadow = true;
+roomLight1.shadow.mapSize.set(256, 256);
 roomLight1.shadow.camera.near = 0.1;
-roomLight1.shadow.camera.far = 15;
+roomLight1.shadow.camera.far = 8;
 roomLight1.shadow.bias = -0.001;
 scene.add(roomLight1);
 
 const roomLight2 = new THREE.PointLight(0xfff5e0, 6.0, 220);
 roomLight2.position.set(5.5, 2.1, 1.18);
-roomLight2.castShadow = false;
-roomLight2.shadow.mapSize.set(512, 512);
+roomLight2.castShadow = true;
+roomLight2.shadow.mapSize.set(256, 256);
 roomLight2.shadow.camera.near = 0.1;
-roomLight2.shadow.camera.far = 15;
+roomLight2.shadow.camera.far = 8;
 roomLight2.shadow.bias = -0.001;
 scene.add(roomLight2);
 
@@ -287,21 +287,6 @@ function loadClassroomAssets(onComplete, onProgress) {
       }
 
       classroomGroup.add(gltf.scene);
-      if (!classroomGroup.userData.shadowLightAdded) {
-        var clsLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
-        clsLight.position.set(3, 7, 2);
-        clsLight.castShadow = true;
-        clsLight.shadow.mapSize.set(1024, 1024);
-        clsLight.shadow.camera.near = 0.5;
-        clsLight.shadow.camera.far = 18;
-        clsLight.shadow.camera.left = -7;
-        clsLight.shadow.camera.right = 7;
-        clsLight.shadow.camera.top = 7;
-        clsLight.shadow.camera.bottom = -7;
-        clsLight.shadow.bias = -0.002;
-        classroomGroup.add(clsLight);
-        classroomGroup.userData.shadowLightAdded = true;
-      }
       if (!dartboardMesh) initDartGame();
     } catch (e) {
       console.error('classroom.glb 처리 오류:', e);
