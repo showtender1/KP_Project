@@ -104,7 +104,7 @@ roomLight4.shadow.bias = -0.001;
 scene.add(roomLight4);
 scene.add(roomLight4.target);
 
-const roomLight5 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
+const roomLight5 = new THREE.SpotLight(0xfff5e0, 12.0, 12, Math.PI/2.5, 0.25);
 roomLight5.position.set(9.6, 2.52, 4.7);
 roomLight5.target.position.set(9.6, 0, 4.7);
 roomLight5.castShadow = true;
@@ -115,7 +115,7 @@ roomLight5.shadow.bias = -0.001;
 scene.add(roomLight5);
 scene.add(roomLight5.target);
 
-const roomLight6 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
+const roomLight6 = new THREE.SpotLight(0xfff5e0, 12.0, 12, Math.PI/2.5, 0.25);
 roomLight6.position.set(-2.64, 2.52, 4.94);
 roomLight6.target.position.set(-2.64, 0, 4.94);
 roomLight6.castShadow = true;
@@ -143,11 +143,11 @@ const BOAT_EYE_HEIGHT      = 6; // 4.42 * 2
 const CLASSROOM_EYE_HEIGHT = 1.7;
 let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 
-const BOAT_START      = new THREE.Vector3(0.19, 22.7, -61.81);
+const BOAT_START      = new THREE.Vector3(-0.3, 25.47, 53.14);
 const CLASSROOM_START = new THREE.Vector3(1.71, 1.70, 5);
 
 playerRig.position.copy(BOAT_START);
-camera.rotation.set(0, Math.PI, 0);
+camera.rotation.set(0, 0, 0);
 
 const raycaster = new THREE.Raycaster();
 const centerPosition = new THREE.Vector2(0, 0);
@@ -238,6 +238,9 @@ const transitionEl  = document.getElementById('transition-overlay');
 const transitionPct = document.getElementById('transition-pct');
 const transitionBar  = document.getElementById('transition-bar');
 const coordsEl     = document.getElementById('coords');
+const boatEntryPopupEl = document.getElementById('boat-entry-popup');
+const portalTooltipEl  = document.getElementById('portal-tooltip');
+let _boatEntryPopupTimer = null;
 
 let _pendingLoadReveal = false;
 
@@ -989,7 +992,15 @@ function switchScene(to) {
       velocityY = 0;
 
       transitionEl.classList.remove('active');
-      setTimeout(() => { transitioning = false; clickHintEl.style.display = 'flex'; }, 320);
+      setTimeout(function() {
+        transitioning = false;
+        clickHintEl.style.display = 'flex';
+        if (boatEntryPopupEl) {
+          boatEntryPopupEl.style.display = 'flex';
+          clearTimeout(_boatEntryPopupTimer);
+          _boatEntryPopupTimer = setTimeout(function() { boatEntryPopupEl.style.display = 'none'; }, 4000);
+        }
+      }, 320);
     }, (pct) => { transitionBar.style.width = pct + '%'; transitionPct.textContent = pct + '%'; });
   } else {
     setTimeout(() => {
@@ -1002,7 +1013,7 @@ function switchScene(to) {
       collisionMeshes.push(...boatCollisionMeshes);
       playerRig.position.copy(BOAT_START);
       playerRig.rotation.y = 0;
-      camera.rotation.set(0, Math.PI, 0);
+      camera.rotation.set(0, 0, 0);
       if (arrowGroup) arrowGroup.visible = true;
       velocityY = 0;
 
@@ -1216,6 +1227,13 @@ function animate() {
     var _objMoving=heldObject||grabbableObjects.some(function(o){return o.userData.physicsActive;});
     if(_doorMoving||_objMoving) renderer.shadowMap.needsUpdate=true;
   }
+  if (currentScene === 'boat' && portalTooltipEl && !renderer.xr.isPresenting) {
+    raycaster.setFromCamera({x:0,y:0}, camera);
+    var _ph = raycaster.intersectObject(portalMesh, false);
+    portalTooltipEl.style.display = _ph.length > 0 ? 'flex' : 'none';
+  } else if (portalTooltipEl && currentScene !== 'boat') {
+    portalTooltipEl.style.display = 'none';
+  }
   if (renderer.xr.isPresenting) {
     renderer.render(scene, camera);
   } else {
@@ -1227,6 +1245,11 @@ function animate() {
     _pendingLoadReveal = false;
     loadingEl.style.display = 'none';
     clickHintEl.style.display = 'flex';
+    if (currentScene === 'boat' && boatEntryPopupEl) {
+      boatEntryPopupEl.style.display = 'flex';
+      clearTimeout(_boatEntryPopupTimer);
+      _boatEntryPopupTimer = setTimeout(function() { boatEntryPopupEl.style.display = 'none'; }, 4000);
+    }
   }
 }
 

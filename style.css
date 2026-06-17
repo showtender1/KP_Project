@@ -204,6 +204,55 @@ button:active {
   backdrop-filter: blur(14px) !important;
 }
 
+/* ===== 보트 진입 팝업 ===== */
+#boat-entry-popup {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+  font-family: inherit;
+  padding: 12px 28px;
+  border-radius: 99px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  z-index: 200;
+  white-space: nowrap;
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* ===== 포털 호버 툴팁 ===== */
+#portal-tooltip {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 10px 24px;
+  border-radius: 99px;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  z-index: 200;
+  white-space: nowrap;
+}
+
 /* ===== 십자선 ===== */
 #crosshair {
   position: absolute;
