@@ -328,7 +328,7 @@ function loadClassroomAssets(onComplete, onProgress) {
       gltf.scene.position.set(2.7, -0.02, 4.83);
 
       // Kit 도어 메시를 충돌 배열에서 제외하기 위해 먼저 수집
-      const KIT_DOOR_NAMES = new Set(['Kit_Door_Left', 'Kit_Door_Right', 'Kit_Door']);
+      const KIT_DOOR_NAMES = new Set(['Kit_Door_Left', 'Kit_Door_Right', 'Kit_Door', 'Kit_Door2']);
       const kitDoorMeshes = new Set();
       gltf.scene.traverse((node) => {
         if (KIT_DOOR_NAMES.has(node.name)) node.traverse(n => kitDoorMeshes.add(n));
@@ -345,7 +345,7 @@ function loadClassroomAssets(onComplete, onProgress) {
       });
 
       // 잡을 수 있는 오브젝트 / Kit 도어 등록
-      const GRABBABLE_NAMES = new Set(['Stool_Left', 'Stool_Right', 'Book', 'chair1', 'chair2', 'chair3', 'Cousion1', 'Cousion2', 'Cousion3', 'Dish', 'Jigger1', 'Jigger2', 'Kit_Bottle', 'Kit_Chair']);
+      const GRABBABLE_NAMES = new Set(['Stool_Left', 'Stool_Right', 'Book', 'chair1', 'chair2', 'chair3', 'Cousion1', 'Cousion2', 'Cousion3', 'Dish', 'Jigger1', 'Jigger2', 'Kit_Bottle', 'Kit_Chair', 'Bar_Chair_1', 'Bar_Chair_2', 'Bar_Chair_3', 'Bar_Chair_4', 'Bar_Chair_5', 'Bar_Chair_6', 'Bar_Chair_7', 'Bar_Chair_8', 'Cacktale', 'Ice_Can', 'RH_Highball', 'RH_RoundDecanter', 'Wine', 'Wine_Met']);
       const kitDoorPair = [];
       gltf.scene.traverse((node) => {
         if (GRABBABLE_NAMES.has(node.name)) {
@@ -357,7 +357,7 @@ function loadClassroomAssets(onComplete, onProgress) {
           const closedRot = node.rotation.y; // GLB 원래 위치
           node.userData.isOpen = false;
           node.userData.closedRotation = closedRot;
-          node.userData.openRotationY = node.name === 'Kit_Door_Right' || node.name === 'Kit_Door'
+          node.userData.openRotationY = node.name === 'Kit_Door_Right' || node.name === 'Kit_Door' || node.name === 'Kit_Door2'
             ? closedRot + Math.PI / 2   // Right: 오른쪽으로 90도
             : closedRot - Math.PI / 2;  // Left: 왼쪽으로 90도
           node.userData.targetRotation = closedRot;
@@ -367,9 +367,11 @@ function loadClassroomAssets(onComplete, onProgress) {
         }
       });
       // 두 Kit 도어 연결 — 한 쪽 클릭 시 양쪽 동시 작동
-      if (kitDoorPair.length === 2) {
-        kitDoorPair[0].userData.linkedDoor = kitDoorPair[1];
-        kitDoorPair[1].userData.linkedDoor = kitDoorPair[0];
+      var _kLeft = kitDoorPair.find(function(d){return d.name==='Kit_Door_Left';});
+      var _kRight = kitDoorPair.find(function(d){return d.name==='Kit_Door_Right';});
+      if (_kLeft && _kRight) {
+        _kLeft.userData.linkedDoor = _kRight;
+        _kRight.userData.linkedDoor = _kLeft;
       }
 
       classroomGroup.add(gltf.scene);
