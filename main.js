@@ -256,6 +256,16 @@ let _pendingLoadReveal = false;
 let _hoverTick = 0;
 let _hoverTargets = [];
 function _rebuildHoverTargets() { _hoverTargets = [...interactableDoors, ...grabbableObjects]; }
+let _nearColliders = collisionMeshes;
+const _nearBase = new THREE.Vector3(Infinity, 0, Infinity);
+function _refreshNear(pos) {
+  _nearBase.copy(pos);
+  _nearColliders = collisionMeshes.length < 40 ? collisionMeshes :
+    collisionMeshes.filter(function(m) {
+      var wp = m.userData._wpos;
+      return !wp || (Math.abs(wp.x - pos.x) < 6 && Math.abs(wp.z - pos.z) < 6);
+    });
+}
 
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onLoad = () => {
@@ -308,6 +318,7 @@ gltfLoader.load(
     if (currentScene === 'boat') {
       collisionMeshes.length = 0;
       collisionMeshes.push(...boatCollisionMeshes);
+      _nearColliders = collisionMeshes; _nearBase.set(Infinity,0,Infinity);
     }
   },
   (event) => {
@@ -352,12 +363,19 @@ function loadClassroomAssets(onComplete, onProgress) {
         if (_GRAB_TMP.has(node.name)) node.traverse(n => kitDoorMeshes.add(n));
       });
 
+      gltf.scene.updateMatrixWorld(true);
       gltf.scene.traverse((node) => {
         node.matrixAutoUpdate = false;
         node.updateMatrix();
         if (node.isMesh && !kitDoorMeshes.has(node)) {
-          node.castShadow    = true;
           node.receiveShadow = true;
+          if (node.geometry) {
+            node.geometry.computeBoundingBox();
+            const _bs = node.geometry.boundingBox.getSize(new THREE.Vector3()).length();
+            node.castShadow = _bs > 0.4;
+          }
+          node.userData._wpos = new THREE.Vector3();
+          node.getWorldPosition(node.userData._wpos);
           classroomCollisionMeshes.push(node);
         }
       });
@@ -1008,6 +1026,7 @@ function switchScene(to) {
       EYE_HEIGHT = CLASSROOM_EYE_HEIGHT;
       collisionMeshes.length = 0;
       collisionMeshes.push(...classroomCollisionMeshes);
+      _nearColliders = collisionMeshes; _nearBase.set(Infinity,0,Infinity);
       playerRig.position.copy(CLASSROOM_START);
       playerRig.rotation.y = -Math.PI / 2;  // 우측 90도
       camera.rotation.set(0, 0, 0);          // 수평 시선 초기화
@@ -1059,7 +1078,7 @@ function getGroundY(pos) {
   _groundOrigin.set(pos.x, pos.y, pos.z);
   groundRaycaster.set(_groundOrigin, _downVec);
   groundRaycaster.far = EYE_HEIGHT + 1.5;
-  const hits = groundRaycaster.intersectObjects(collisionMeshes, false);
+  const hits = groundRaycaster.intersectObjects(_nearColliders, false);
   return hits.length > 0 ? hits[0].point.y + EYE_HEIGHT : -Infinity;
 }
 
@@ -1068,7 +1087,7 @@ function checkCollision(pos) {
   _checkPos.set(pos.x, pos.y - 1.0, pos.z);
   for (const dir of COLLISION_DIRS) {
     collisionRaycaster.set(_checkPos, dir);
-    const hits = collisionRaycaster.intersectObjects(collisionMeshes, false);
+    const hits = collisionRaycaster.intersectObjects(_nearColliders, false);
     if (hits.length > 0 && hits[0].distance < PLAYER_RADIUS) return true;
   }
   return false;
@@ -1107,6 +1126,7 @@ function updateMovement(delta) {
   const dz = (_rightVec.z * playerVel.x + _forwardVec.z * playerVel.y) * delta;
 
   const pos  = playerRig.position;
+  if (Math.abs(pos.x - _nearBase.x) > 1.5 || Math.abs(pos.z - _nearBase.z) > 1.5) _refreshNear(pos);
   const oldX = pos.x;
   const oldZ = pos.z;
 
@@ -1131,7 +1151,7 @@ function updateMovement(delta) {
   if (proposedDY > 0 && collisionMeshes.length > 0) {
     ceilingRaycaster.set(pos, _upVec);
     ceilingRaycaster.far = proposedDY + 0.25;
-    const ceilHits = ceilingRaycaster.intersectObjects(collisionMeshes, false);
+    const ceilHits = ceilingRaycaster.intersectObjects(_nearColliders, false);
     if (ceilHits.length > 0) {
       pos.y += Math.max(0, ceilHits[0].distance - 0.25);
       velocityY = 0;
@@ -1245,9 +1265,14 @@ function animate() {
   if (++_hoverTick % 3 === 0) updateHoverHighlight();
 
   if (currentScene==='classroom') {
-    var _doorMoving=interactableDoors.some(function(d){return Math.abs(d.rotation.y-(d.userData.targetRotation??0))>0.001;});
+    var _doorMoved=interactableDoors.some(function(d){
+      var prev=d.userData._lastShadowRot??d.rotation.y;
+      var moved=Math.abs(d.rotation.y-prev)>0.015;
+      if(moved) d.userData._lastShadowRot=d.rotation.y;
+      return moved;
+    });
     var _objMoving=heldObject||grabbableObjects.some(function(o){return o.userData.physicsActive;});
-    if(_doorMoving||_objMoving) renderer.shadowMap.needsUpdate=true;
+    if(_doorMoved||_objMoving) renderer.shadowMap.needsUpdate=true;
   }
   if (currentScene === 'boat' && portalTooltipEl && !renderer.xr.isPresenting) {
     raycaster.setFromCamera({x:0,y:0}, camera);
