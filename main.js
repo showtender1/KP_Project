@@ -16,7 +16,7 @@ function assetUrl(relativePath) {
 let _lastTime = performance.now();
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -250,6 +250,7 @@ const portalTooltipEl  = document.getElementById('portal-tooltip');
 let _boatEntryPopupTimer = null;
 
 let _pendingLoadReveal = false;
+let _hoverTick = 0;
 
 const loadingManager = new THREE.LoadingManager();
 loadingManager.onLoad = () => {
@@ -1229,7 +1230,7 @@ function animate() {
     door.rotation.y = THREE.MathUtils.lerp(door.rotation.y, door.userData.targetRotation, doorAlpha);
   }
 
-  updateHoverHighlight();
+  if (++_hoverTick % 3 === 0) updateHoverHighlight();
 
   if (currentScene==='classroom') {
     var _doorMoving=interactableDoors.some(function(d){return Math.abs(d.rotation.y-(d.userData.targetRotation??0))>0.001;});
@@ -1254,8 +1255,10 @@ function animate() {
   }
   if (renderer.xr.isPresenting) {
     renderer.render(scene, camera);
-  } else {
+  } else if (outlinePass.selectedObjects.length > 0) {
     composer.render();
+  } else {
+    renderer.render(scene, camera);
   }
 
   // 렌더가 실제로 끝난 직후 로딩 화면 제거
