@@ -287,6 +287,7 @@ function loadClassroomAssets(onComplete, onProgress) {
       }
 
       classroomGroup.add(gltf.scene);
+      if (!dartboardMesh) initDartGame();
     } catch (e) {
       console.error('classroom.glb 처리 오류:', e);
     }
@@ -584,6 +585,146 @@ function updateXRPointers() {
 }
 
 
+// ===== DART GAME =====
+const DART_SECTORS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+let dartThrowsLeft = 3;
+let dartRoundScore = 0;
+const dartObjects = [];
+let dartboardMesh = null;
+let scorePanelCanvas = null, scorePanelCtx = null, scorePanelTexture = null;
+
+function _drawDartboard() {
+  const SIZE = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = SIZE;
+  const ctx = c.getContext('2d');
+  const cx = SIZE/2, cy = SIZE/2, R = SIZE/2;
+  const SEG = Math.PI*2/20;
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fill();
+  const rings = [
+    [1.0, 0.95, function(i){ return i%2===0?'#cc2200':'#00881a'; }],
+    [0.95, 0.855, function(i){ return i%2===0?'#f0e6c8':'#111'; }],
+    [0.855, 0.63, function(i){ return i%2===0?'#cc2200':'#00881a'; }],
+    [0.63, 0.535, function(i){ return i%2===0?'#f0e6c8':'#111'; }],
+  ];
+  for (var ri=0; ri<rings.length; ri++) {
+    var outer=rings[ri][0], inner=rings[ri][1], colorFn=rings[ri][2];
+    for (var i=0; i<20; i++) {
+      var a0=-Math.PI/2+i*SEG-SEG/2, a1=a0+SEG;
+      ctx.beginPath();
+      ctx.arc(cx,cy,R*outer,a0,a1);
+      ctx.arc(cx,cy,R*inner,a1,a0,true);
+      ctx.closePath();
+      ctx.fillStyle=colorFn(i); ctx.fill();
+    }
+  }
+  ctx.beginPath(); ctx.arc(cx,cy,R*0.085,0,Math.PI*2); ctx.fillStyle='#00881a'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,R*0.04,0,Math.PI*2);  ctx.fillStyle='#cc2200'; ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.font='bold '+Math.round(R*0.095)+'px Arial';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for (var i=0;i<20;i++) {
+    var a=-Math.PI/2+i*SEG;
+    ctx.fillText(DART_SECTORS[i], cx+R*0.975*Math.cos(a), cy+R*0.975*Math.sin(a));
+  }
+  var tex=new THREE.CanvasTexture(c);
+  tex.flipY=false;
+  return tex;
+}
+
+function _calcDartScore(u, v) {
+  var dx=u-0.5, dy=v-0.5;
+  var dist=Math.sqrt(dx*dx+dy*dy);
+  if (dist>0.475) return 0;
+  if (dist<0.02)  return 50;
+  if (dist<0.0425) return 25;
+  var SEG=Math.PI*2/20;
+  var angle=Math.atan2(dy,dx); if(angle<0) angle+=Math.PI*2;
+  var norm=(angle-(1.5*Math.PI-SEG/2)+4*Math.PI)%(Math.PI*2);
+  var val=DART_SECTORS[Math.floor(norm/SEG)%20];
+  if (dist<0.2675) return val;
+  if (dist<0.315)  return val*3;
+  if (dist<0.4275) return val;
+  return val*2;
+}
+
+function _updateScorePanel() {
+  var ctx=scorePanelCtx, W=scorePanelCanvas.width, H=scorePanelCanvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='rgba(10,15,25,0.93)';
+  ctx.beginPath(); ctx.roundRect(2,2,W-4,H-4,14); ctx.fill();
+  ctx.fillStyle='#58a6ff'; ctx.font='bold 30px Arial'; ctx.textAlign='center';
+  ctx.fillText('DARTS',W/2,46);
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='22px Arial';
+  ctx.fillText('●'.repeat(dartThrowsLeft)+'○'.repeat(3-dartThrowsLeft),W/2,92);
+  ctx.fillStyle='#79c0ff'; ctx.font='bold 60px Arial';
+  ctx.fillText(dartRoundScore,W/2,168);
+  ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.font='17px Arial';
+  ctx.fillText(dartThrowsLeft===0?'Click to reset':'Aim & Click to throw',W/2,220);
+  scorePanelTexture.needsUpdate=true;
+}
+
+function _throwDart(intersection) {
+  if (dartThrowsLeft===0) { _resetDartGame(); return; }
+  var uv=intersection.uv;
+  var score=_calcDartScore(uv.x,uv.y);
+  dartRoundScore+=score; dartThrowsLeft--;
+  var dGeo=new THREE.CylinderGeometry(0.006,0.006,0.09,8);
+  var dMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,metalness:0.85,roughness:0.15});
+  var dart=new THREE.Mesh(dGeo,dMat);
+  dart.matrixAutoUpdate=true;
+  dart.position.copy(intersection.point).addScaledVector(intersection.face.normal,0.045);
+  dart.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),intersection.face.normal.clone().negate());
+  scene.add(dart); dartObjects.push(dart);
+  var popC=document.createElement('canvas'); popC.width=160; popC.height=72;
+  var pc=popC.getContext('2d');
+  pc.fillStyle=score>=50?'#ff4040':score>=30?'#ffaa00':'#58a6ff';
+  pc.font='bold 44px Arial'; pc.textAlign='center'; pc.textBaseline='middle';
+  pc.fillText(score===0?'Miss!':'+'+score,80,36);
+  var popTex=new THREE.CanvasTexture(popC);
+  var popSpr=new THREE.Sprite(new THREE.SpriteMaterial({map:popTex,depthTest:false}));
+  popSpr.scale.set(0.36,0.16,1);
+  popSpr.position.copy(intersection.point).addScaledVector(intersection.face.normal,0.06);
+  popSpr.position.y+=0.12;
+  scene.add(popSpr); dartObjects.push(popSpr);
+  setTimeout(function(){ scene.remove(popSpr); popTex.dispose(); popSpr.material.dispose(); },1600);
+  _updateScorePanel();
+}
+
+function _resetDartGame() {
+  dartThrowsLeft=3; dartRoundScore=0;
+  dartObjects.forEach(function(d){ scene.remove(d); }); dartObjects.length=0;
+  _updateScorePanel();
+}
+
+function initDartGame() {
+  var dbTex=_drawDartboard();
+  dartboardMesh=new THREE.Mesh(
+    new THREE.CircleGeometry(0.35,64),
+    new THREE.MeshStandardMaterial({map:dbTex,roughness:0.8})
+  );
+  dartboardMesh.userData.isDartboard=true;
+  dartboardMesh.matrixAutoUpdate=true;
+  dartboardMesh.position.set(-0.85,1.7,0.1);
+  dartboardMesh.rotation.y=Math.PI/2;
+  classroomGroup.add(dartboardMesh);
+  scorePanelCanvas=document.createElement('canvas');
+  scorePanelCanvas.width=scorePanelCanvas.height=256;
+  scorePanelCtx=scorePanelCanvas.getContext('2d');
+  scorePanelTexture=new THREE.CanvasTexture(scorePanelCanvas);
+  var panelMesh=new THREE.Mesh(
+    new THREE.PlaneGeometry(0.5,0.5),
+    new THREE.MeshBasicMaterial({map:scorePanelTexture,transparent:true,side:THREE.DoubleSide})
+  );
+  panelMesh.matrixAutoUpdate=true;
+  panelMesh.position.set(-0.85,2.25,0.1);
+  panelMesh.rotation.y=Math.PI/2;
+  classroomGroup.add(panelMesh);
+  _updateScorePanel();
+}
+
+
 function _toggleDoor(door) {
   door.userData.isOpen = !door.userData.isOpen;
   const open = door.userData.openRotationY ?? Math.PI / 2;
@@ -625,6 +766,7 @@ function handleXRSelect(controller) {
     return;
   }
 
+  if (dartboardMesh && hit.object===dartboardMesh && hit.uv) { _throwDart(hit); return; }
   let obj = hit.object;
   while (!Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen') && obj.parent) obj = obj.parent;
   if (Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen')) {
@@ -705,6 +847,7 @@ window.addEventListener('mousedown', (e) => {
     if (portalHit.length > 0) { switchScene('classroom'); return; }
   }
 
+  if (dartboardMesh) { var dh=raycaster.intersectObject(dartboardMesh,false); if(dh.length>0&&dh[0].uv){_throwDart(dh[0]);return;} }
   const intersects = raycaster.intersectObjects(interactableDoors, true);
   if (intersects.length > 0) {
     let clicked = intersects[0].object;
