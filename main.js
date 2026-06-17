@@ -242,7 +242,7 @@ function loadClassroomAssets(onComplete, onProgress) {
       gltf.scene.position.set(2.7, -0.02, 4.83);
 
       // Kit 도어 메시를 충돌 배열에서 제외하기 위해 먼저 수집
-      const KIT_DOOR_NAMES = new Set(['Kit_Door_Left', 'Kit_Door_Right']);
+      const KIT_DOOR_NAMES = new Set(['Kit_Door_Left', 'Kit_Door_Right', 'Kit_Door']);
       const kitDoorMeshes = new Set();
       gltf.scene.traverse((node) => {
         if (KIT_DOOR_NAMES.has(node.name)) node.traverse(n => kitDoorMeshes.add(n));
