@@ -230,7 +230,7 @@ function loadClassroomAssets(onComplete, onProgress) {
   classroomLoading = true;
 
   let loaded = 0;
-  const total = 5;
+  const total = 4;
   const check = () => {
     loaded++;
     if (onProgress) onProgress(Math.round(loaded / total * 100));
@@ -259,7 +259,7 @@ function loadClassroomAssets(onComplete, onProgress) {
       });
 
       // 잡을 수 있는 오브젝트 / Kit 도어 등록
-      const GRABBABLE_NAMES = new Set(['Stool_Left', 'Stool_Right', 'Book']);
+      const GRABBABLE_NAMES = new Set(['Stool_Left', 'Stool_Right', 'Book', 'chair1', 'chair2', 'chair3', 'Cousion1', 'Cousion2', 'Cousion3', 'Dish', 'Jigger1', 'Jigger2', 'Kit_Bottle', 'Kit_Chair']);
       const kitDoorPair = [];
       gltf.scene.traverse((node) => {
         if (GRABBABLE_NAMES.has(node.name)) {
@@ -271,7 +271,7 @@ function loadClassroomAssets(onComplete, onProgress) {
           const closedRot = node.rotation.y; // GLB 원래 위치
           node.userData.isOpen = false;
           node.userData.closedRotation = closedRot;
-          node.userData.openRotationY = node.name === 'Kit_Door_Right'
+          node.userData.openRotationY = node.name === 'Kit_Door_Right' || node.name === 'Kit_Door'
             ? closedRot + Math.PI / 2   // Right: 오른쪽으로 90도
             : closedRot - Math.PI / 2;  // Left: 왼쪽으로 90도
           node.userData.targetRotation = closedRot;
@@ -334,28 +334,6 @@ function loadClassroomAssets(onComplete, onProgress) {
     classroomGroup.add(door3);
     check();
   }, undefined, (err) => { console.error('door3.glb 로드 실패:', err); check(); });
-
-  const KIT_GRABBABLE = new Set([
-    'chair1', 'chair2', 'chair3',
-    'Cousion1', 'Cousion2', 'Cousion3',
-    'Dish', 'Jigger1', 'Jigger2', 'Kit_Bottle', 'Kit_Chair'
-  ]);
-  classroomLoader.load(assetUrl('models/Kit.glb'), (gltf) => {
-    gltf.scene.traverse((node) => {
-      node.matrixAutoUpdate = false;
-      node.updateMatrix();
-      if (node.isMesh) { node.castShadow = false; node.receiveShadow = false; }
-    });
-    gltf.scene.traverse((node) => {
-      if (KIT_GRABBABLE.has(node.name)) {
-        node.userData.isGrabbable = true;
-        node.traverse(n => { n.matrixAutoUpdate = true; });
-        grabbableObjects.push(node);
-      }
-    });
-    classroomGroup.add(gltf.scene);
-    check();
-  }, undefined, (err) => { console.error('Kit.glb 로드 실패:', err); check(); });
 }
 
 // ===== 오브젝트 물리 =====
