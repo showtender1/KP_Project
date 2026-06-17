@@ -147,6 +147,7 @@ const BOAT_START      = new THREE.Vector3(0.19, 22.7, -61.81);
 const CLASSROOM_START = new THREE.Vector3(1.71, 1.70, 5);
 
 playerRig.position.copy(BOAT_START);
+camera.rotation.set(0, Math.PI, 0);
 
 const raycaster = new THREE.Raycaster();
 const centerPosition = new THREE.Vector2(0, 0);
@@ -210,9 +211,7 @@ head.rotation.x = Math.PI / 2;
 head.position.z = 1.2;
 head.matrixAutoUpdate = true;
 arrowGroup.add(head);
-arrowGroup.position.set(0.19, 21.8, -59.5);
 boatGroup.add(arrowGroup);
-var _arrowBaseY = arrowGroup.position.y;
 var _arrowTime = 0;
 scene.add(classroomGroup);
 
@@ -978,6 +977,7 @@ function switchScene(to) {
     loadClassroomAssets(() => {
       boatGroup.visible      = false;
       classroomGroup.visible = true;
+      if (arrowGroup) arrowGroup.visible = false;
       renderer.shadowMap.needsUpdate = true;
       currentScene = 'classroom';
       EYE_HEIGHT = CLASSROOM_EYE_HEIGHT;
@@ -1002,7 +1002,8 @@ function switchScene(to) {
       collisionMeshes.push(...boatCollisionMeshes);
       playerRig.position.copy(BOAT_START);
       playerRig.rotation.y = 0;
-      camera.rotation.set(0, 0, 0);
+      camera.rotation.set(0, Math.PI, 0);
+      if (arrowGroup) arrowGroup.visible = true;
       velocityY = 0;
 
       transitionEl.classList.remove('active');
@@ -1199,7 +1200,7 @@ function animate() {
 
   const p = playerRig.position;
   coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
-  if (currentScene==='boat' && arrowGroup) { _arrowTime+=delta*2.5; arrowGroup.position.y=_arrowBaseY+Math.sin(_arrowTime)*0.18; arrowGroup.rotation.y=Math.sin(_arrowTime*0.4)*0.15; }
+  if (currentScene==='boat' && arrowGroup) {    _arrowTime += delta * 2.5;    var _camFwd = new THREE.Vector3();    camera.getWorldDirection(_camFwd);    _camFwd.y = 0; _camFwd.normalize();    arrowGroup.position.copy(playerRig.position);    arrowGroup.position.y = playerRig.position.y - 0.4;    arrowGroup.position.addScaledVector(_camFwd, 2.5);    arrowGroup.position.y += Math.sin(_arrowTime) * 0.12;    var _px = arrowGroup.position.x, _pz = arrowGroup.position.z;    var _toPortal = new THREE.Vector3(-0.03 - _px, 0, -37.47 - _pz);    arrowGroup.rotation.y = Math.atan2(_toPortal.x, _toPortal.z);  }
 
   if (currentScene === 'classroom') updatePhysics(delta);
 
