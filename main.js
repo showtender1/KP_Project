@@ -143,7 +143,7 @@ const BOAT_EYE_HEIGHT      = 6; // 4.42 * 2
 const CLASSROOM_EYE_HEIGHT = 1.7;
 let EYE_HEIGHT = BOAT_EYE_HEIGHT;
 
-const BOAT_START      = new THREE.Vector3(-0.3, 25.47, 53.14);
+const BOAT_START      = new THREE.Vector3(0.19, 22.7, -61.81);
 const CLASSROOM_START = new THREE.Vector3(1.71, 1.70, 5);
 
 playerRig.position.copy(BOAT_START);
@@ -180,6 +180,40 @@ const boatGroup      = new THREE.Group();
 const classroomGroup = new THREE.Group();
 classroomGroup.visible = false;
 scene.add(boatGroup);
+
+// ===== 보트 씬 태양광 (그림자용) =====
+const sunLight = new THREE.DirectionalLight(0xfff8e7, 2.5);
+sunLight.position.set(120, 180, 80);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 800;
+sunLight.shadow.camera.left = -200;
+sunLight.shadow.camera.right = 200;
+sunLight.shadow.camera.top = 200;
+sunLight.shadow.camera.bottom = -200;
+sunLight.shadow.bias = -0.0005;
+boatGroup.add(sunLight);
+
+// ===== 포털 방향 안내 화살표 =====
+var arrowGroup = new THREE.Group();
+arrowGroup.matrixAutoUpdate = true;
+var arrowMat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffee00, emissiveIntensity: 3, roughness: 0.2, metalness: 0 });
+var shaftGeo = new THREE.CylinderGeometry(0.07, 0.07, 1.8, 12);
+var shaft = new THREE.Mesh(shaftGeo, arrowMat);
+shaft.rotation.x = Math.PI / 2;
+shaft.matrixAutoUpdate = true;
+arrowGroup.add(shaft);
+var headGeo = new THREE.ConeGeometry(0.22, 0.6, 12);
+var head = new THREE.Mesh(headGeo, arrowMat);
+head.rotation.x = Math.PI / 2;
+head.position.z = 1.2;
+head.matrixAutoUpdate = true;
+arrowGroup.add(head);
+arrowGroup.position.set(0.19, 21.8, -59.5);
+boatGroup.add(arrowGroup);
+var _arrowBaseY = arrowGroup.position.y;
+var _arrowTime = 0;
 scene.add(classroomGroup);
 
 let currentScene  = 'boat';
@@ -255,6 +289,7 @@ gltfLoader.load(
       }
     });
     boatGroup.add(gltf.scene);
+    renderer.shadowMap.needsUpdate = true;
     if (currentScene === 'boat') {
       collisionMeshes.length = 0;
       collisionMeshes.push(...boatCollisionMeshes);
@@ -960,6 +995,7 @@ function switchScene(to) {
     setTimeout(() => {
       classroomGroup.visible = false;
       boatGroup.visible      = true;
+      renderer.shadowMap.needsUpdate = true;
       currentScene = 'boat';
       EYE_HEIGHT = BOAT_EYE_HEIGHT;
       collisionMeshes.length = 0;
@@ -1163,6 +1199,7 @@ function animate() {
 
   const p = playerRig.position;
   coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
+  if (currentScene==='boat' && arrowGroup) { _arrowTime+=delta*2.5; arrowGroup.position.y=_arrowBaseY+Math.sin(_arrowTime)*0.18; arrowGroup.rotation.y=Math.sin(_arrowTime*0.4)*0.15; }
 
   if (currentScene === 'classroom') updatePhysics(delta);
 
