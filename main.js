@@ -8,11 +8,13 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
 
 function assetUrl(relativePath) {
   return new URL(relativePath, import.meta.url).href;
 }
 
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 let _lastTime = performance.now();
 const scene = new THREE.Scene();
 
@@ -202,6 +204,7 @@ gltfLoader.load(
       if (node.isMesh) {
         node.castShadow    = true;
         node.receiveShadow = true;
+        if (!node.geometry.boundsTree) node.geometry.boundsTree = new MeshBVH(node.geometry);
         boatCollisionMeshes.push(node);
       }
     });
@@ -254,6 +257,7 @@ function loadClassroomAssets(onComplete, onProgress) {
         if (node.isMesh && !kitDoorMeshes.has(node)) {
           node.castShadow    = false;
           node.receiveShadow = false;
+          if (!node.geometry.boundsTree) node.geometry.boundsTree = new MeshBVH(node.geometry);
           classroomCollisionMeshes.push(node);
         }
       });
