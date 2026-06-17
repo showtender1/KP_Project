@@ -1230,7 +1230,16 @@ function animate() {
   if (currentScene === 'boat' && portalTooltipEl && !renderer.xr.isPresenting) {
     raycaster.setFromCamera({x:0,y:0}, camera);
     var _ph = raycaster.intersectObject(portalMesh, false);
-    portalTooltipEl.style.display = _ph.length > 0 ? 'flex' : 'none';
+    if (_ph.length > 0) {
+      portalTooltipEl.style.display = 'flex';
+      var _pp = portalMesh.getWorldPosition(new THREE.Vector3()); _pp.project(camera);
+      if (_pp.z < 1) {
+        portalTooltipEl.style.left = ((_pp.x * 0.5 + 0.5) * window.innerWidth) + 'px';
+        portalTooltipEl.style.top = ((1 - (_pp.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';
+      }
+    } else {
+      portalTooltipEl.style.display = 'none';
+    }
   } else if (portalTooltipEl && currentScene !== 'boat') {
     portalTooltipEl.style.display = 'none';
   }

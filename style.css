@@ -232,8 +232,8 @@ button:active {
 /* ===== 포털 호버 툴팁 ===== */
 #portal-tooltip {
   position: fixed;
-  bottom: 60px;
-  left: 50%;
+  top: 0;
+  left: 0;
   transform: translateX(-50%);
   display: none;
   align-items: center;
