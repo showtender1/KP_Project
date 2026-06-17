@@ -207,8 +207,8 @@ button:active {
 /* ===== 보트 진입 팝업 ===== */
 #boat-entry-popup {
   position: fixed;
-  bottom: 100px;
-  left: 50%;
+  top: 0;
+  left: 0;
   transform: translateX(-50%);
   display: none;
   align-items: center;
