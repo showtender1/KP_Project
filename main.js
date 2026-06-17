@@ -25,6 +25,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false;
 renderer.xr.enabled = true;
 renderer.xr.setFramebufferScaleFactor(0.75);
 renderer.xr.setFoveation(0.0);
@@ -59,23 +60,27 @@ renderer.xr.addEventListener('sessionend', () => {
 const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
 scene.add(hemiLight);
 
-const roomLight1 = new THREE.PointLight(0xfff5e0, 6.0, 220);
+const roomLight1 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
 roomLight1.position.set(0, 2.1, 1.18);
+roomLight1.target.position.set(0, 0, 1.18);
 roomLight1.castShadow = true;
-roomLight1.shadow.mapSize.set(256, 256);
+roomLight1.shadow.mapSize.set(512, 512);
 roomLight1.shadow.camera.near = 0.1;
 roomLight1.shadow.camera.far = 8;
 roomLight1.shadow.bias = -0.001;
 scene.add(roomLight1);
+scene.add(roomLight1.target);
 
-const roomLight2 = new THREE.PointLight(0xfff5e0, 6.0, 220);
+const roomLight2 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
 roomLight2.position.set(5.5, 2.1, 1.18);
+roomLight2.target.position.set(5.5, 0, 1.18);
 roomLight2.castShadow = true;
-roomLight2.shadow.mapSize.set(256, 256);
+roomLight2.shadow.mapSize.set(512, 512);
 roomLight2.shadow.camera.near = 0.1;
 roomLight2.shadow.camera.far = 8;
 roomLight2.shadow.bias = -0.001;
 scene.add(roomLight2);
+scene.add(roomLight2.target);
 
 
 const orbit = new OrbitControls(camera, renderer.domElement);
@@ -894,6 +899,7 @@ function switchScene(to) {
     loadClassroomAssets(() => {
       boatGroup.visible      = false;
       classroomGroup.visible = true;
+      renderer.shadowMap.needsUpdate = true;
       currentScene = 'classroom';
       EYE_HEIGHT = CLASSROOM_EYE_HEIGHT;
       collisionMeshes.length = 0;
@@ -1123,6 +1129,11 @@ function animate() {
 
   updateHoverHighlight();
 
+  if (currentScene==='classroom') {
+    var _doorMoving=interactableDoors.some(function(d){return Math.abs(d.rotation.y-(d.userData.targetRotation??0))>0.001;});
+    var _objMoving=heldObject||grabbableObjects.some(function(o){return o.userData.physicsActive;});
+    if(_doorMoving||_objMoving) renderer.shadowMap.needsUpdate=true;
+  }
   if (renderer.xr.isPresenting) {
     renderer.render(scene, camera);
   } else {
