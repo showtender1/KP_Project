@@ -104,6 +104,28 @@ roomLight4.shadow.bias = -0.001;
 scene.add(roomLight4);
 scene.add(roomLight4.target);
 
+const roomLight5 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
+roomLight5.position.set(9.6, 2.52, 4.7);
+roomLight5.target.position.set(9.6, 0, 4.7);
+roomLight5.castShadow = true;
+roomLight5.shadow.mapSize.set(512, 512);
+roomLight5.shadow.camera.near = 0.1;
+roomLight5.shadow.camera.far = 8;
+roomLight5.shadow.bias = -0.001;
+scene.add(roomLight5);
+scene.add(roomLight5.target);
+
+const roomLight6 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
+roomLight6.position.set(-2.64, 2.52, 4.94);
+roomLight6.target.position.set(-2.64, 0, 4.94);
+roomLight6.castShadow = true;
+roomLight6.shadow.mapSize.set(512, 512);
+roomLight6.shadow.camera.near = 0.1;
+roomLight6.shadow.camera.far = 8;
+roomLight6.shadow.bias = -0.001;
+scene.add(roomLight6);
+scene.add(roomLight6.target);
+
 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = false;
