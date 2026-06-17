@@ -1039,6 +1039,8 @@ function handleXRSelect(controller) {
   }
 
   if (_dartStartBtnMesh && hit.object===_dartStartBtnMesh && (_dartState==='idle'||_dartState==='done')){ _resetDartGame(); _dartState='ready'; _updateScorePanel(); return; }
+  // VR에서 ready 상태: 트리거 → 즉시 발사 (drag 없이 보드 중심 방향)
+  if (_dartState==='ready') { _dartChargeX=0; _dartChargeY=0; _dartState='charging'; _dartLaunch(); return; }
   let obj = hit.object;
   while (!Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen') && obj.parent) obj = obj.parent;
   if (Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen')) {
