@@ -61,70 +61,77 @@ const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
 scene.add(hemiLight);
 
 const roomLight1 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
-roomLight1.position.set(0, 2.1, 1.18);
+roomLight1.position.set(0, 2.2, 1.18);
 roomLight1.target.position.set(0, 0, 1.18);
 roomLight1.castShadow = true;
-roomLight1.shadow.mapSize.set(512, 512);
-roomLight1.shadow.camera.near = 0.1;
-roomLight1.shadow.camera.far = 8;
+roomLight1.shadow.mapSize.set(256, 256);
+roomLight1.shadow.camera.near = 0.3;
+roomLight1.shadow.camera.far = 4;
 roomLight1.shadow.bias = -0.001;
 scene.add(roomLight1);
 scene.add(roomLight1.target);
 
 const roomLight2 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
-roomLight2.position.set(5.5, 2.1, 1.18);
+roomLight2.position.set(5.5, 2.2, 1.18);
 roomLight2.target.position.set(5.5, 0, 1.18);
-roomLight2.castShadow = true;
-roomLight2.shadow.mapSize.set(512, 512);
-roomLight2.shadow.camera.near = 0.1;
-roomLight2.shadow.camera.far = 8;
-roomLight2.shadow.bias = -0.001;
 scene.add(roomLight2);
 scene.add(roomLight2.target);
 
 const roomLight3 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
-roomLight3.position.set(1.36, 2.52, 8.15);
+roomLight3.position.set(1.36, 2.2, 8.15);
 roomLight3.target.position.set(1.36, 0, 8.15);
 roomLight3.castShadow = true;
-roomLight3.shadow.mapSize.set(512, 512);
-roomLight3.shadow.camera.near = 0.1;
-roomLight3.shadow.camera.far = 8;
+roomLight3.shadow.mapSize.set(256, 256);
+roomLight3.shadow.camera.near = 0.3;
+roomLight3.shadow.camera.far = 4;
 roomLight3.shadow.bias = -0.001;
 scene.add(roomLight3);
 scene.add(roomLight3.target);
 
 const roomLight4 = new THREE.SpotLight(0xfff5e0, 6.0, 12, Math.PI/2.5, 0.25);
-roomLight4.position.set(6.55, 2.52, 8.42);
+roomLight4.position.set(6.55, 2.2, 8.42);
 roomLight4.target.position.set(6.55, 0, 8.42);
-roomLight4.castShadow = true;
-roomLight4.shadow.mapSize.set(512, 512);
-roomLight4.shadow.camera.near = 0.1;
-roomLight4.shadow.camera.far = 8;
-roomLight4.shadow.bias = -0.001;
 scene.add(roomLight4);
 scene.add(roomLight4.target);
 
 const roomLight5 = new THREE.SpotLight(0xfff5e0, 12.0, 12, Math.PI/2.5, 0.25);
-roomLight5.position.set(9.6, 2.52, 4.7);
+roomLight5.position.set(9.6, 2.2, 4.7);
 roomLight5.target.position.set(9.6, 0, 4.7);
 roomLight5.castShadow = true;
-roomLight5.shadow.mapSize.set(512, 512);
-roomLight5.shadow.camera.near = 0.1;
-roomLight5.shadow.camera.far = 8;
+roomLight5.shadow.mapSize.set(256, 256);
+roomLight5.shadow.camera.near = 0.3;
+roomLight5.shadow.camera.far = 4;
 roomLight5.shadow.bias = -0.001;
 scene.add(roomLight5);
 scene.add(roomLight5.target);
 
 const roomLight6 = new THREE.SpotLight(0xfff5e0, 12.0, 12, Math.PI/2.5, 0.25);
-roomLight6.position.set(-2.64, 2.52, 4.94);
+roomLight6.position.set(-2.64, 2.2, 4.94);
 roomLight6.target.position.set(-2.64, 0, 4.94);
-roomLight6.castShadow = true;
-roomLight6.shadow.mapSize.set(512, 512);
-roomLight6.shadow.camera.near = 0.1;
-roomLight6.shadow.camera.far = 8;
-roomLight6.shadow.bias = -0.001;
 scene.add(roomLight6);
 scene.add(roomLight6.target);
+
+const roomLight7 = new THREE.SpotLight(0xfff5e0, 8.0, 12, Math.PI/2.5, 0.25);
+roomLight7.position.set(14.06, 2.2, 6.91);
+roomLight7.target.position.set(14.06, 0, 6.91);
+roomLight7.castShadow = true;
+roomLight7.shadow.mapSize.set(256, 256);
+roomLight7.shadow.camera.near = 0.3;
+roomLight7.shadow.camera.far = 4;
+roomLight7.shadow.bias = -0.001;
+scene.add(roomLight7);
+scene.add(roomLight7.target);
+
+const roomLight8 = new THREE.SpotLight(0xfff5e0, 8.0, 12, Math.PI/2.5, 0.25);
+roomLight8.position.set(13.89, 2.2, -0.33);
+roomLight8.target.position.set(13.89, 0, -0.33);
+roomLight8.castShadow = true;
+roomLight8.shadow.mapSize.set(256, 256);
+roomLight8.shadow.camera.near = 0.3;
+roomLight8.shadow.camera.far = 4;
+roomLight8.shadow.bias = -0.001;
+scene.add(roomLight8);
+scene.add(roomLight8.target);
 
 
 const orbit = new OrbitControls(camera, renderer.domElement);
