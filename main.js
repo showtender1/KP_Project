@@ -141,7 +141,14 @@ const fps = new PointerLockControls(camera, document.body);
 
 // playerRig: 이동의 기준점. camera는 rig 안에 있어 XR/데스크톱 모두 동작
 const playerRig = new THREE.Group();
+const vrFadeMat = new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false, depthWrite: false, side: THREE.FrontSide });
+const vrFadePlane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), vrFadeMat);
+vrFadePlane.position.set(0, 0, -1);
+vrFadePlane.renderOrder = 9999;
+vrFadePlane.visible = false;
+let _vrFadeFrames = 0;
 playerRig.add(camera);
+camera.add(vrFadePlane);
 scene.add(playerRig);
 
 const BOAT_FLOOR_Y = 35.0;
@@ -344,7 +351,24 @@ function loadClassroomAssets(onComplete, onProgress) {
   const check = () => {
     loaded++;
     if (onProgress) onProgress(Math.round(loaded / total * 100));
-    if (loaded === total) { classroomReady = true; classroomLoading = false; onComplete(); }
+    if (loaded === total) {
+      classroomReady = true;
+      classroomLoading = false;
+      // Pre-warm: compile shaders + upload textures before scene switch
+      classroomGroup.visible = true;
+      renderer.compile(scene, camera);
+      classroomGroup.traverse(function(n) {
+        if (!n.isMesh || !n.material) return;
+        var mats = Array.isArray(n.material) ? n.material : [n.material];
+        mats.forEach(function(m) {
+          ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap'].forEach(function(k) {
+            if (m[k]) renderer.initTexture(m[k]);
+          });
+        });
+      });
+      classroomGroup.visible = false;
+      onComplete();
+    }
   };
 
   classroomLoader.load(assetUrl('models/classroom.glb'), (gltf) => {
@@ -1018,6 +1042,7 @@ function switchScene(to) {
     if (!classroomReady) {
     }
     loadClassroomAssets(() => {
+      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 90; }
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       if (arrowGroup) arrowGroup.visible = false;
@@ -1045,6 +1070,7 @@ function switchScene(to) {
     }, (pct) => { transitionBar.style.width = pct + '%'; transitionPct.textContent = pct + '%'; });
   } else {
     setTimeout(() => {
+      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 90; }
       classroomGroup.visible = false;
       boatGroup.visible      = true;
       renderer.shadowMap.needsUpdate = true;
@@ -1251,6 +1277,7 @@ function animate() {
     console.error('animate error:', e);
   }
 
+  if (_vrFadeFrames > 0) { _vrFadeFrames--; if (_vrFadeFrames === 0) vrFadePlane.visible = false; }
   const p = playerRig.position;
   coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
   if (currentScene==='boat' && arrowGroup) {    _arrowTime += delta * 2.5;    var _camFwd = new THREE.Vector3();    camera.getWorldDirection(_camFwd);    _camFwd.y = 0; _camFwd.normalize();    arrowGroup.position.copy(playerRig.position);    arrowGroup.position.y = playerRig.position.y - 1.0;    arrowGroup.position.addScaledVector(_camFwd, 2.5);    arrowGroup.position.y += Math.sin(_arrowTime) * 0.12;    var _px = arrowGroup.position.x, _pz = arrowGroup.position.z;    var _toPortal = new THREE.Vector3(-0.03 - _px, 0, -37.47 - _pz);    arrowGroup.rotation.y = Math.atan2(_toPortal.x, _toPortal.z);    if (boatEntryPopupEl && boatEntryPopupEl.style.display === 'flex') {      var _wp = arrowGroup.position.clone(); _wp.project(camera);      if (_wp.z < 1) {        boatEntryPopupEl.style.left = ((_wp.x * 0.5 + 0.5) * window.innerWidth) + 'px';        boatEntryPopupEl.style.top = ((1 - (_wp.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';      }    }  }
