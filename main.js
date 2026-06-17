@@ -742,6 +742,14 @@ let dartRoundScore = 0;
 const dartObjects = [];
 let dartboardMesh = null;
 let scorePanelCanvas = null, scorePanelCtx = null, scorePanelTexture = null;
+let _dartStartBtnMesh = null;
+let _dartArcLine = null;
+let _dartState = 'idle'; // idle|ready|charging|flying|done
+let _dartChargeX = 0, _dartChargeY = 0;
+let _dartFlight = null; // {pos,vel,mesh}
+const _DART_WX = 15.85, _DART_WY = 1.7, _DART_WZ = 7.95;
+const _DART_R = 0.525;
+const _DART_GRAVITY = 9.8;
 
 function _drawDartboard() {
   const SIZE = 512;
@@ -805,72 +813,186 @@ function _updateScorePanel() {
   ctx.fillStyle='rgba(10,15,25,0.93)';
   ctx.beginPath(); ctx.roundRect(2,2,W-4,H-4,14); ctx.fill();
   ctx.fillStyle='#58a6ff'; ctx.font='bold 30px Arial'; ctx.textAlign='center';
-  ctx.fillText('DARTS',W/2,46);
+  ctx.fillText('DARTS',W/2,40);
   ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='22px Arial';
-  ctx.fillText('●'.repeat(dartThrowsLeft)+'○'.repeat(3-dartThrowsLeft),W/2,92);
+  ctx.fillText('●'.repeat(dartThrowsLeft)+'○'.repeat(3-dartThrowsLeft),W/2,80);
   ctx.fillStyle='#79c0ff'; ctx.font='bold 60px Arial';
-  ctx.fillText(dartRoundScore,W/2,168);
-  ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.font='17px Arial';
-  ctx.fillText(dartThrowsLeft===0?'Click to reset':'Aim & Click to throw',W/2,220);
+  ctx.fillText(dartRoundScore,W/2,152);
+  ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.font='15px Arial';
+  var hint='';
+  if(_dartState==='idle'||_dartState==='done') hint='Aim at START & click';
+  else if(_dartState==='ready') hint='Hold & drag to throw';
+  else if(_dartState==='charging'){
+    var pwr=Math.round(Math.min(1,Math.sqrt(_dartChargeX*_dartChargeX+_dartChargeY*_dartChargeY)/150)*100);
+    hint='Power '+pwr+'%  Release!';
+  } else if(_dartState==='flying') hint='...';
+  ctx.fillText(hint,W/2,210);
   scorePanelTexture.needsUpdate=true;
 }
 
-function _throwDart(intersection) {
-  if (dartThrowsLeft===0) { _resetDartGame(); return; }
-  var uv=intersection.uv;
-  var score=_calcDartScore(uv.x,uv.y);
-  dartRoundScore+=score; dartThrowsLeft--;
-  var dGeo=new THREE.CylinderGeometry(0.006,0.006,0.09,8);
-  var dMat=new THREE.MeshStandardMaterial({color:0xbbbbbb,metalness:0.85,roughness:0.15});
-  var dart=new THREE.Mesh(dGeo,dMat);
-  dart.matrixAutoUpdate=true;
-  dart.position.copy(intersection.point).addScaledVector(intersection.face.normal,0.045);
-  dart.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),intersection.face.normal.clone().negate());
-  scene.add(dart); dartObjects.push(dart);
-  var popC=document.createElement('canvas'); popC.width=160; popC.height=72;
-  var pc=popC.getContext('2d');
-  pc.fillStyle=score>=50?'#ff4040':score>=30?'#ffaa00':'#58a6ff';
-  pc.font='bold 44px Arial'; pc.textAlign='center'; pc.textBaseline='middle';
-  pc.fillText(score===0?'Miss!':'+'+score,80,36);
-  var popTex=new THREE.CanvasTexture(popC);
-  var popSpr=new THREE.Sprite(new THREE.SpriteMaterial({map:popTex,depthTest:false}));
-  popSpr.scale.set(0.36,0.16,1);
-  popSpr.position.copy(intersection.point).addScaledVector(intersection.face.normal,0.06);
-  popSpr.position.y+=0.12;
-  scene.add(popSpr); dartObjects.push(popSpr);
-  setTimeout(function(){ scene.remove(popSpr); popTex.dispose(); popSpr.material.dispose(); },1600);
+function _dartLaunch() {
+  if (dartThrowsLeft===0 || _dartState!=='charging') return;
+  _dartState='flying';
+  var camPos=new THREE.Vector3();
+  camera.getWorldPosition(camPos);
+  var dx=_DART_WX-camPos.x, dz_=_DART_WZ-camPos.z, dy0=_DART_WY-camPos.y;
+  var horiz=Math.sqrt(dx*dx+dz_*dz_);
+  var FT=Math.max(0.35,Math.min(0.7,horiz/20));
+  var vx=dx/FT, vz_=dz_/FT;
+  var vy=dy0/FT+0.5*_DART_GRAVITY*FT;
+  // drag: chargeY negative=drag up=aim higher; chargeX right=aim +Z
+  var SENS=0.04;
+  vy+=-_dartChargeY*SENS;
+  vz_+=_dartChargeX*SENS;
+  var mesh=new THREE.Mesh(
+    new THREE.CylinderGeometry(0.006,0.002,0.24,8),
+    new THREE.MeshStandardMaterial({color:0xd4aa70,metalness:0.5,roughness:0.4})
+  );
+  mesh.matrixAutoUpdate=true;
+  mesh.position.copy(camPos);
+  scene.add(mesh);
+  _dartFlight={pos:camPos.clone(),vel:new THREE.Vector3(vx,vy,vz_),mesh:mesh};
+  dartThrowsLeft--;
   _updateScorePanel();
+  if(_dartArcLine){scene.remove(_dartArcLine);_dartArcLine.geometry.dispose();_dartArcLine=null;}
+}
+
+function _dartUpdate(delta) {
+  if (!_dartFlight) return;
+  _dartFlight.vel.y-=_DART_GRAVITY*delta;
+  _dartFlight.pos.addScaledVector(_dartFlight.vel,delta);
+  var m=_dartFlight.mesh;
+  m.position.copy(_dartFlight.pos);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),_dartFlight.vel.clone().normalize());
+  // Board plane check (dart crossed X = _DART_WX from left)
+  if(_dartFlight.pos.x>=_DART_WX-0.05){
+    var wy=_dartFlight.pos.y, wz=_dartFlight.pos.z;
+    var dz=wz-_DART_WZ, dy=wy-_DART_WY;
+    var dist=Math.sqrt(dz*dz+dy*dy);
+    scene.remove(m);
+    if(dist<=_DART_R){
+      // Embed dart in board
+      var stk=new THREE.Mesh(
+        new THREE.CylinderGeometry(0.006,0.002,0.18,8),
+        new THREE.MeshStandardMaterial({color:0xd4aa70,metalness:0.5,roughness:0.4})
+      );
+      stk.matrixAutoUpdate=true;
+      stk.position.set(_DART_WX,wy,wz);
+      stk.rotation.z=Math.PI/2; // axis → -X (dart tail toward player)
+      scene.add(stk); dartObjects.push(stk);
+      // Score from UV
+      var u=0.5+dz/(2*_DART_R), v=0.5+dy/(2*_DART_R);
+      var score=_calcDartScore(u,v);
+      dartRoundScore+=score;
+      // Popup sprite
+      var popC=document.createElement('canvas'); popC.width=160; popC.height=72;
+      var pc=popC.getContext('2d');
+      pc.fillStyle=score>=50?'#ff4040':score>=25?'#ffaa00':'#58a6ff';
+      pc.font='bold 44px Arial'; pc.textAlign='center'; pc.textBaseline='middle';
+      pc.fillText(score===0?'Miss!':'+'+score,80,36);
+      var popTex=new THREE.CanvasTexture(popC);
+      var popSpr=new THREE.Sprite(new THREE.SpriteMaterial({map:popTex,depthTest:false}));
+      popSpr.scale.set(0.36,0.16,1);
+      popSpr.position.set(_DART_WX,wy+0.15,wz);
+      scene.add(popSpr); dartObjects.push(popSpr);
+      setTimeout(function(){scene.remove(popSpr);popTex.dispose();popSpr.material.dispose();},1800);
+    }
+    m.geometry.dispose(); m.material.dispose();
+    _dartFlight=null;
+    _updateScorePanel();
+    _dartState=dartThrowsLeft>0?'ready':'done';
+  }
+  // Fell below floor or far past board
+  if(_dartFlight&&(_dartFlight.pos.y<-1||_dartFlight.pos.x>_DART_WX+2)){
+    scene.remove(_dartFlight.mesh);
+    _dartFlight.mesh.geometry.dispose(); _dartFlight.mesh.material.dispose();
+    _dartFlight=null;
+    _updateScorePanel();
+    _dartState=dartThrowsLeft>0?'ready':'done';
+  }
+}
+
+function _dartUpdateArc() {
+  if(_dartState!=='charging'){
+    if(_dartArcLine){scene.remove(_dartArcLine);_dartArcLine.geometry.dispose();_dartArcLine=null;}
+    return;
+  }
+  var camPos=new THREE.Vector3();
+  camera.getWorldPosition(camPos);
+  var dx=_DART_WX-camPos.x, dz_=_DART_WZ-camPos.z, dy0=_DART_WY-camPos.y;
+  var horiz=Math.sqrt(dx*dx+dz_*dz_);
+  var FT=Math.max(0.35,Math.min(0.7,horiz/20));
+  var vx=dx/FT, vz_=dz_/FT+_dartChargeX*0.04;
+  var vy=dy0/FT+0.5*_DART_GRAVITY*FT-_dartChargeY*0.04;
+  var pts=[], p=camPos.clone(), v=new THREE.Vector3(vx,vy,vz_), dt=0.03;
+  for(var i=0;i<40;i++){
+    pts.push(p.x,p.y,p.z);
+    v.y-=_DART_GRAVITY*dt;
+    p.x+=v.x*dt; p.y+=v.y*dt; p.z+=v.z*dt;
+    if(p.x>=_DART_WX){pts.push(_DART_WX,p.y,p.z);break;}
+  }
+  if(!_dartArcLine){
+    _dartArcLine=new THREE.Line(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({color:0xffee00,transparent:true,opacity:0.8,depthTest:false})
+    );
+    _dartArcLine.renderOrder=999;
+    scene.add(_dartArcLine);
+  }
+  var arr=new Float32Array(pts);
+  _dartArcLine.geometry.setAttribute('position',new THREE.BufferAttribute(arr,3));
+  _dartArcLine.geometry.setDrawRange(0,pts.length/3);
+  _dartArcLine.geometry.computeBoundingSphere();
 }
 
 function _resetDartGame() {
   dartThrowsLeft=3; dartRoundScore=0;
-  dartObjects.forEach(function(d){ scene.remove(d); }); dartObjects.length=0;
+  dartObjects.forEach(function(d){scene.remove(d);}); dartObjects.length=0;
+  _dartState='idle'; _dartFlight=null;
+  if(_dartArcLine){scene.remove(_dartArcLine);_dartArcLine.geometry.dispose();_dartArcLine=null;}
   _updateScorePanel();
 }
 
 function initDartGame() {
   var dbTex=_drawDartboard();
   dartboardMesh=new THREE.Mesh(
-    new THREE.CircleGeometry(0.35,64),
+    new THREE.CircleGeometry(0.525,64),
     new THREE.MeshStandardMaterial({map:dbTex,roughness:0.8})
   );
   dartboardMesh.userData.isDartboard=true;
   dartboardMesh.matrixAutoUpdate=true;
-  dartboardMesh.position.set(-0.85,1.7,0.1);
-  dartboardMesh.rotation.y=Math.PI/2;
+  dartboardMesh.position.set(_DART_WX,_DART_WY,_DART_WZ);
+  dartboardMesh.rotation.y=-Math.PI/2;
   classroomGroup.add(dartboardMesh);
+  // Score panel
   scorePanelCanvas=document.createElement('canvas');
   scorePanelCanvas.width=scorePanelCanvas.height=256;
   scorePanelCtx=scorePanelCanvas.getContext('2d');
   scorePanelTexture=new THREE.CanvasTexture(scorePanelCanvas);
   var panelMesh=new THREE.Mesh(
-    new THREE.PlaneGeometry(0.5,0.5),
+    new THREE.PlaneGeometry(0.6,0.6),
     new THREE.MeshBasicMaterial({map:scorePanelTexture,transparent:true,side:THREE.DoubleSide})
   );
   panelMesh.matrixAutoUpdate=true;
-  panelMesh.position.set(-0.85,2.25,0.1);
-  panelMesh.rotation.y=Math.PI/2;
+  panelMesh.position.set(_DART_WX,_DART_WY+0.82,_DART_WZ);
+  panelMesh.rotation.y=-Math.PI/2;
   classroomGroup.add(panelMesh);
+  // Start button
+  var btnC=document.createElement('canvas'); btnC.width=256; btnC.height=96;
+  var bc=btnC.getContext('2d');
+  bc.fillStyle='#1a4a2a'; bc.roundRect(4,4,248,88,12); bc.fill();
+  bc.fillStyle='#55ee77'; bc.font='bold 38px Arial';
+  bc.textAlign='center'; bc.textBaseline='middle';
+  bc.fillText('▶  START',128,48);
+  _dartStartBtnMesh=new THREE.Mesh(
+    new THREE.PlaneGeometry(0.5,0.19),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(btnC),transparent:true,side:THREE.DoubleSide})
+  );
+  _dartStartBtnMesh.userData.isDartStart=true;
+  _dartStartBtnMesh.matrixAutoUpdate=true;
+  _dartStartBtnMesh.position.set(_DART_WX,_DART_WY-0.68,_DART_WZ);
+  _dartStartBtnMesh.rotation.y=-Math.PI/2;
+  classroomGroup.add(_dartStartBtnMesh);
   _updateScorePanel();
 }
 
@@ -916,7 +1038,7 @@ function handleXRSelect(controller) {
     return;
   }
 
-  if (dartboardMesh && hit.object===dartboardMesh && hit.uv) { _throwDart(hit); return; }
+  if (_dartStartBtnMesh && hit.object===_dartStartBtnMesh && (_dartState==='idle'||_dartState==='done')){ _resetDartGame(); _dartState='ready'; _updateScorePanel(); return; }
   let obj = hit.object;
   while (!Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen') && obj.parent) obj = obj.parent;
   if (Object.prototype.hasOwnProperty.call(obj.userData, 'isOpen')) {
@@ -976,6 +1098,14 @@ window.addEventListener('mousedown', (e) => {
   if (!fps.isLocked || e.button !== 0) return;
   raycaster.setFromCamera(centerPosition, camera);
 
+  // 다트 던지기: ready 상태에서 마우스 홀드 시작
+  if (currentScene==='classroom' && _dartState==='ready' && !heldObject) {
+    _dartChargeX=0; _dartChargeY=0;
+    _dartState='charging';
+    fps.enabled=false;
+    _updateScorePanel();
+    return;
+  }
   // 잡기/놓기 (교실에서만)
   if (currentScene === 'classroom') {
     if (heldObject) { dropObject(); return; }
@@ -997,7 +1127,10 @@ window.addEventListener('mousedown', (e) => {
     if (portalHit.length > 0) { switchScene('classroom'); return; }
   }
 
-  if (dartboardMesh) { var dh=raycaster.intersectObject(dartboardMesh,false); if(dh.length>0&&dh[0].uv){_throwDart(dh[0]);return;} }
+  if (_dartStartBtnMesh && currentScene==='classroom') {
+    var _ds=raycaster.intersectObject(_dartStartBtnMesh,false);
+    if(_ds.length>0&&(_dartState==='idle'||_dartState==='done')){_resetDartGame();_dartState='ready';_updateScorePanel();return;}
+  }
   const intersects = raycaster.intersectObjects(interactableDoors, true);
   if (intersects.length > 0) {
     let clicked = intersects[0].object;
@@ -1012,6 +1145,22 @@ window.addEventListener('mousedown', (e) => {
   }
 });
 
+// 다트 drag accumulation
+window.addEventListener('mousemove', function(e) {
+  if (_dartState==='charging') {
+    _dartChargeX+=e.movementX||0;
+    _dartChargeY+=e.movementY||0;
+    _dartChargeX=Math.max(-200,Math.min(200,_dartChargeX));
+    _dartChargeY=Math.max(-200,Math.min(200,_dartChargeY));
+    _updateScorePanel();
+  }
+});
+window.addEventListener('mouseup', function(e) {
+  if (e.button===0 && _dartState==='charging') {
+    fps.enabled=true;
+    _dartLaunch();
+  }
+});
 // 화면 클릭 or 키 입력 → 데스크톱 FPS 진입 (VR 모드가 아닐 때만)
 function tryLockFPS() {
   if (!fps.isLocked && !orbit.enabled && !transitioning && !renderer.xr.isPresenting) fps.lock();
@@ -1282,7 +1431,7 @@ function animate() {
   coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
   if (currentScene==='boat' && arrowGroup) {    _arrowTime += delta * 2.5;    var _camFwd = new THREE.Vector3();    camera.getWorldDirection(_camFwd);    _camFwd.y = 0; _camFwd.normalize();    arrowGroup.position.copy(playerRig.position);    arrowGroup.position.y = playerRig.position.y - 1.0;    arrowGroup.position.addScaledVector(_camFwd, 2.5);    arrowGroup.position.y += Math.sin(_arrowTime) * 0.12;    var _px = arrowGroup.position.x, _pz = arrowGroup.position.z;    var _toPortal = new THREE.Vector3(-0.03 - _px, 0, -37.47 - _pz);    arrowGroup.rotation.y = Math.atan2(_toPortal.x, _toPortal.z);    if (boatEntryPopupEl && boatEntryPopupEl.style.display === 'flex') {      var _wp = arrowGroup.position.clone(); _wp.project(camera);      if (_wp.z < 1) {        boatEntryPopupEl.style.left = ((_wp.x * 0.5 + 0.5) * window.innerWidth) + 'px';        boatEntryPopupEl.style.top = ((1 - (_wp.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';      }    }  }
 
-  if (currentScene === 'classroom') updatePhysics(delta);
+  if (currentScene === 'classroom') { updatePhysics(delta); _dartUpdate(delta); _dartUpdateArc(); }
 
   const doorAlpha = 1 - Math.exp(-10 * delta);
   for (const door of interactableDoors) {
