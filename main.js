@@ -36,7 +36,7 @@ document.body.appendChild(VRButton.createButton(renderer));
 // EffectComposer + OutlinePass (데스크톱 호버 강조)
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const outlinePass = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera);
+const outlinePass = new OutlinePass(new THREE.Vector2(Math.round(window.innerWidth / 2), Math.round(window.innerHeight / 2)), scene, camera);
 outlinePass.edgeStrength   = 5.0;
 outlinePass.edgeGlow       = 0.8;
 outlinePass.edgeThickness  = 2.0;
@@ -304,7 +304,13 @@ let _boatEntryPopupTimer = null;
 let _pendingLoadReveal = false;
 let _hoverTick = 0;
 let _shadowMoveTick = 0;
+let _coordsTick = 0;
+let _portalRayTick = 0;
 let _hoverTargets = [];
+const _camFwdVec   = new THREE.Vector3();
+const _toPortalVec = new THREE.Vector3();
+const _arrowWpVec  = new THREE.Vector3();
+const _portalWpVec = new THREE.Vector3();
 function _rebuildHoverTargets() { _hoverTargets = [...interactableDoors, ...grabbableObjects]; }
 let _nearColliders = collisionMeshes;
 const _nearBase = new THREE.Vector3(Infinity, 0, Infinity);
@@ -555,7 +561,9 @@ function loadClassroomAssets(onComplete, onProgress) {
 // ===== 오브젝트 물리 =====
 const _physicsRaycaster = new THREE.Raycaster();
 _physicsRaycaster.firstHitOnly = true;
-const _physDown = new THREE.Vector3(0, -1, 0);
+const _physDown   = new THREE.Vector3(0, -1, 0);
+const _physOrigin = new THREE.Vector3();
+const _physRayH   = [0, 0, 0];
 const PHYS_GRAVITY  = 20;
 const PHYS_BOUNCE   = 0.22;
 const PHYS_FRICTION = 7;
@@ -589,14 +597,15 @@ function updatePhysics(delta) {
     // 수평 벽 충돌: 이동 전 사전 체크 (하/중/상 3개 높이 레이캐스트)
     const OBJ_R = 0.25;
     const baseY = obj.position.y + btm;
-    const rayHeights = [baseY + 0.05, baseY + 0.2, baseY + 0.4];
+    _physRayH[0] = baseY + 0.05; _physRayH[1] = baseY + 0.2; _physRayH[2] = baseY + 0.4;
     for (const dir of COLLISION_DIRS) {
       const hVel = dir.x !== 0 ? vel.x : vel.z;
       if (Math.sign(hVel) !== Math.sign(dir.x + dir.z)) continue;
       let minDist = Infinity;
       const castFar = Math.abs(hVel) * delta + OBJ_R + 0.1;
-      for (const ry of rayHeights) {
-        _physicsRaycaster.set(new THREE.Vector3(obj.position.x, ry, obj.position.z), dir);
+      for (const ry of _physRayH) {
+        _physOrigin.set(obj.position.x, ry, obj.position.z);
+        _physicsRaycaster.set(_physOrigin, dir);
         _physicsRaycaster.far = castFar;
         const wh = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
         if (wh.length > 0 && wh[0].distance < minDist) minDist = wh[0].distance;
@@ -613,7 +622,8 @@ function updatePhysics(delta) {
     // 천장 충돌: 이동 전 사전 체크
     if (vel.y > 0) {
       const proposedUp = vel.y * delta;
-      _physicsRaycaster.set(new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z), _upVec);
+      _physOrigin.copy(obj.position);
+      _physicsRaycaster.set(_physOrigin, _upVec);
       _physicsRaycaster.far = proposedUp + 0.1;
       const ch = _physicsRaycaster.intersectObjects(classroomCollisionMeshes, false);
       if (ch.length > 0 && ch[0].distance <= proposedUp + 0.05) {
@@ -1334,7 +1344,7 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
-  outlinePass.resolution.set(window.innerWidth, window.innerHeight);
+  outlinePass.resolution.set(Math.round(window.innerWidth / 2), Math.round(window.innerHeight / 2));
 });
 
 // ===== 바닥 감지 (하방 레이캐스트) =====
@@ -1517,8 +1527,8 @@ function animate() {
 
   if (_vrFadeFrames > 0) { _vrFadeFrames--; if (_vrFadeFrames === 0) { vrFadePlane.visible = false; _vrClearInfo(); } }
   const p = playerRig.position;
-  coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
-  if (currentScene==='boat' && arrowGroup) {    _arrowTime += delta * 2.5;    var _camFwd = new THREE.Vector3();    camera.getWorldDirection(_camFwd);    _camFwd.y = 0; _camFwd.normalize();    arrowGroup.position.copy(playerRig.position);    arrowGroup.position.y = playerRig.position.y - 1.0;    arrowGroup.position.addScaledVector(_camFwd, 2.5);    arrowGroup.position.y += Math.sin(_arrowTime) * 0.12;    var _px = arrowGroup.position.x, _pz = arrowGroup.position.z;    var _toPortal = new THREE.Vector3(-0.03 - _px, 0, -37.47 - _pz);    arrowGroup.rotation.y = Math.atan2(_toPortal.x, _toPortal.z);    if (boatEntryPopupEl && boatEntryPopupEl.style.display === 'flex') {      var _wp = arrowGroup.position.clone(); _wp.project(camera);      if (_wp.z < 1) {        boatEntryPopupEl.style.left = ((_wp.x * 0.5 + 0.5) * window.innerWidth) + 'px';        boatEntryPopupEl.style.top = ((1 - (_wp.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';      }    }  }
+  if (++_coordsTick % 6 === 0) coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
+  if (currentScene==='boat' && arrowGroup) {    _arrowTime += delta * 2.5;    camera.getWorldDirection(_camFwdVec);    _camFwdVec.y = 0; _camFwdVec.normalize();    arrowGroup.position.copy(playerRig.position);    arrowGroup.position.y = playerRig.position.y - 1.0;    arrowGroup.position.addScaledVector(_camFwdVec, 2.5);    arrowGroup.position.y += Math.sin(_arrowTime) * 0.12;    var _px = arrowGroup.position.x, _pz = arrowGroup.position.z;    _toPortalVec.set(-0.03 - _px, 0, -37.47 - _pz);    arrowGroup.rotation.y = Math.atan2(_toPortalVec.x, _toPortalVec.z);    if (boatEntryPopupEl && boatEntryPopupEl.style.display === 'flex') {      _arrowWpVec.copy(arrowGroup.position); _arrowWpVec.project(camera);      if (_arrowWpVec.z < 1) {        boatEntryPopupEl.style.left = ((_arrowWpVec.x * 0.5 + 0.5) * window.innerWidth) + 'px';        boatEntryPopupEl.style.top = ((1 - (_arrowWpVec.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';      }    }  }
 
   if (currentScene === 'classroom') { updatePhysics(delta); _dartUpdate(delta); _dartUpdateArc(); }
 
@@ -1532,7 +1542,7 @@ function animate() {
   if (currentScene==='classroom') {
     var _doorMoved=interactableDoors.some(function(d){
       var prev=d.userData._lastShadowRot??d.rotation.y;
-      var moved=Math.abs(d.rotation.y-prev)>0.015;
+      var moved=Math.abs(d.rotation.y-prev)>0.03;
       if(moved) d.userData._lastShadowRot=d.rotation.y;
       return moved;
     });
@@ -1541,17 +1551,19 @@ function animate() {
     else if(_objMoving && ++_shadowMoveTick%3===0) renderer.shadowMap.needsUpdate=true;
   }
   if (currentScene === 'boat' && portalTooltipEl && !renderer.xr.isPresenting) {
-    raycaster.setFromCamera({x:0,y:0}, camera);
-    var _ph = raycaster.intersectObject(portalMesh, false);
-    if (_ph.length > 0) {
-      portalTooltipEl.style.display = 'flex';
-      var _pp = portalMesh.getWorldPosition(new THREE.Vector3()); _pp.project(camera);
-      if (_pp.z < 1) {
-        portalTooltipEl.style.left = ((_pp.x * 0.5 + 0.5) * window.innerWidth) + 'px';
-        portalTooltipEl.style.top = ((1 - (_pp.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';
+    if (++_portalRayTick % 3 === 0) {
+      raycaster.setFromCamera(centerPosition, camera);
+      var _ph = raycaster.intersectObject(portalMesh, false);
+      if (_ph.length > 0) {
+        portalTooltipEl.style.display = 'flex';
+        portalMesh.getWorldPosition(_portalWpVec); _portalWpVec.project(camera);
+        if (_portalWpVec.z < 1) {
+          portalTooltipEl.style.left = ((_portalWpVec.x * 0.5 + 0.5) * window.innerWidth) + 'px';
+          portalTooltipEl.style.top = ((1 - (_portalWpVec.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';
+        }
+      } else {
+        portalTooltipEl.style.display = 'none';
       }
-    } else {
-      portalTooltipEl.style.display = 'none';
     }
   } else if (portalTooltipEl && currentScene !== 'boat') {
     portalTooltipEl.style.display = 'none';
