@@ -48,15 +48,11 @@ composer.addPass(new OutputPass());
 // VR 세션 시작: 그림자 끄기 + 포인터락 해제 + 클릭힌트 숨기기
 renderer.xr.addEventListener('sessionstart', () => {
   renderer.shadowMap.enabled = false;
-  // VR 조명 교체 + 셰이더 사전 컴파일 (블랙 fade 뒤에서 진행)
-  vrFadePlane.visible = true; _vrFadeFrames = 0;
-  _vrSetInfo('VR 초기화 중...', '셰이더 컴파일 중...');
+  // sessionstart는 첫 XR 프레임보다 먼저 실행됨 (JS 싱글스레드 보장)
+  // → 동기 compile이 안전: XR 프레임 시작 전 모든 셰이더 준비 완료
   _enableVRLights();
-  renderer.compileAsync(scene, camera).then(function() {
-    _vrSetInfo('준비 완료!', '씬이 곧 나타납니다');
-    _vrFadeFrames = 60;
-  });
-  renderer.xr.setFoveation(1.0);
+  renderer.compile(scene, camera);
+  renderer.xr.setFoveation(0.5); // 1.0은 엣지 아티팩트 발생, 0.5로 완화
   if (fps.isLocked) fps.unlock();
   clickHintEl.style.display = 'none';
 });
