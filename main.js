@@ -460,10 +460,6 @@ function loadClassroomAssets(onComplete, onProgress) {
         });
       } else {
         renderer.compile(scene, camera);
-        // VR 셰이더 변형 사전 컴파일 (조명 수/종류 바뀌면 재컴파일 발생 방지)
-        _enableVRLights();
-        renderer.compile(scene, camera);
-        _disableVRLights();
         _finalizePrewarm();
       }
     }
