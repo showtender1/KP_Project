@@ -399,20 +399,33 @@ function loadClassroomAssets(onComplete, onProgress) {
       classroomLoading = false;
       // Pre-warm: compile shaders + upload textures before scene switch
       // VR: pre-warm 블로킹 전 fade 확실히 켬 + UI 업데이트
-      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 0; _vrSetInfo('GPU 준비 중...', '약 1~2초 소요됩니다'); }
       classroomGroup.visible = true;
-      renderer.compile(scene, camera);
-      classroomGroup.traverse(function(n) {
-        if (!n.isMesh || !n.material) return;
-        var mats = Array.isArray(n.material) ? n.material : [n.material];
-        mats.forEach(function(m) {
-          ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap'].forEach(function(k) {
-            if (m[k]) renderer.initTexture(m[k]);
+      // 텍스처 업로드 + onComplete 공통 처리
+      function _finalizePrewarm() {
+        classroomGroup.traverse(function(n) {
+          if (!n.isMesh || !n.material) return;
+          var mats = Array.isArray(n.material) ? n.material : [n.material];
+          mats.forEach(function(m) {
+            ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap'].forEach(function(k) {
+              if (m[k]) renderer.initTexture(m[k]);
+            });
           });
         });
-      });
-      classroomGroup.visible = false;
-      onComplete();
+        classroomGroup.visible = false;
+        onComplete();
+      }
+      if (renderer.xr.isPresenting) {
+        // VR: compileAsync → XR 루프 차단 없이 비동기 셰이더 컴파일
+        vrFadePlane.visible = true; _vrFadeFrames = 0;
+        _vrSetInfo('GPU 준비 중...', '쉐이더 컴파일 중...');
+        renderer.compileAsync(scene, camera).then(function() {
+          _vrSetInfo('준비 완료', '씬이 곧 나타납니다');
+          _finalizePrewarm();
+        });
+      } else {
+        renderer.compile(scene, camera);
+        _finalizePrewarm();
+      }
     }
   };
 
@@ -1285,13 +1298,15 @@ function switchScene(to) {
     });
   } else {
     setTimeout(() => {
-      // VR: 이미 블랙아웃 중; boat warm-up 후 카운트다운
+      // VR: compileAsync → 셰이더 준비 완료 후 fade-in 시작
       if (renderer.xr.isPresenting) {
         classroomGroup.visible = false;
         boatGroup.visible = true;
-        renderer.compile(scene, camera); // boat 쉐이더 재확인
-        _vrSetInfo('이동 완료', '잠시 후 요트가 나타납니다');
-        _vrFadeFrames = 150;
+        _vrSetInfo('쉐이더 준비 중...', '잠시만 기다려 주세요');
+        renderer.compileAsync(scene, camera).then(function() {
+          _vrSetInfo('이동 완료!', '요트가 곧 나타납니다');
+          _vrFadeFrames = 90;
+        });
       } else {
         classroomGroup.visible = false;
         boatGroup.visible = true;
