@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -55,6 +55,8 @@ renderer.xr.addEventListener('sessionstart', () => {
   renderer.xr.setFoveation(0.5); // 1.0은 엣지 아티팩트 발생, 0.5로 완화
   if (fps.isLocked) fps.unlock();
   clickHintEl.style.display = 'none';
+  crosshairEl.style.display = 'none';
+  document.body.style.cursor = 'none';
 });
 // VR 세션 종료: 그림자 복원 + 클릭힌트 표시
 renderer.xr.addEventListener('sessionend', () => {
@@ -63,6 +65,8 @@ renderer.xr.addEventListener('sessionend', () => {
   renderer.shadowMap.needsUpdate = true;
   renderer.xr.setFoveation(0.0);
   if (!transitioning) clickHintEl.style.display = 'flex';
+  crosshairEl.style.display = '';
+  document.body.style.cursor = '';
 });
 
 const hemiLight = new THREE.HemisphereLight(0xddeeff, 0xd4c9b0, 0.1);
@@ -322,6 +326,7 @@ const transitionEl  = document.getElementById('transition-overlay');
 const transitionPct = document.getElementById('transition-pct');
 const transitionBar  = document.getElementById('transition-bar');
 const coordsEl     = document.getElementById('coords');
+const crosshairEl  = document.getElementById('crosshair');
 const boatEntryPopupEl = document.getElementById('boat-entry-popup');
 const portalTooltipEl  = document.getElementById('portal-tooltip');
 let _boatEntryPopupTimer = null;
@@ -1273,6 +1278,8 @@ renderer.domElement.addEventListener('click', tryLockFPS);
 
 fps.addEventListener('lock', () => {
   clickHintEl.style.display = 'none';
+  crosshairEl.style.display = 'none';
+  document.body.style.cursor = 'none';
 });
 
 fps.addEventListener('unlock', () => {
