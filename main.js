@@ -355,6 +355,8 @@ function loadClassroomAssets(onComplete, onProgress) {
       classroomReady = true;
       classroomLoading = false;
       // Pre-warm: compile shaders + upload textures before scene switch
+      // VR: pre-warm 블로킹 전 fade 확실히 켬
+      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 0; }
       classroomGroup.visible = true;
       renderer.compile(scene, camera);
       classroomGroup.traverse(function(n) {
@@ -1187,13 +1189,20 @@ function switchScene(to) {
   orbit.enabled = false;
   clickHintEl.style.display = 'none';
 
+  // VR: 클릭 즉시 블랙아웃 (로딩/pre-warm 전에 XR compositor가 검은 프레임 캐시)
+  if (renderer.xr.isPresenting) {
+    vrFadePlane.visible = true;
+    _vrFadeFrames = 0; // 아직 카운트다운 시작 안 함 (씬 준비 후 시작)
+  }
+
   transitionEl.classList.add('active');
 
   if (to === 'classroom') {
     if (!classroomReady) {
     }
     loadClassroomAssets(() => {
-      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 90; }
+      // VR: 이미 블랙아웃 중; 씬 전환 후 카운트다운 시작
+      if (renderer.xr.isPresenting) { _vrFadeFrames = 150; }
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       if (arrowGroup) arrowGroup.visible = false;
@@ -1221,9 +1230,16 @@ function switchScene(to) {
     }, (pct) => { transitionBar.style.width = pct + '%'; transitionPct.textContent = pct + '%'; });
   } else {
     setTimeout(() => {
-      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 90; }
-      classroomGroup.visible = false;
-      boatGroup.visible      = true;
+      // VR: 이미 블랙아웃 중; boat warm-up 후 카운트다운
+      if (renderer.xr.isPresenting) {
+        classroomGroup.visible = false;
+        boatGroup.visible = true;
+        renderer.compile(scene, camera); // boat 쉐이더 재확인
+        _vrFadeFrames = 150;
+      } else {
+        classroomGroup.visible = false;
+        boatGroup.visible = true;
+      }
       renderer.shadowMap.needsUpdate = true;
       currentScene = 'boat';
       EYE_HEIGHT = BOAT_EYE_HEIGHT;
