@@ -151,6 +151,43 @@ playerRig.add(camera);
 camera.add(vrFadePlane);
 scene.add(playerRig);
 
+// VR 전용 3D 로딩 패널 (카메라 자식, CSS 오버레이 대체)
+const _vrInfoCanvas = document.createElement('canvas');
+_vrInfoCanvas.width = 512; _vrInfoCanvas.height = 160;
+const _vrInfoCtx = _vrInfoCanvas.getContext('2d');
+const _vrInfoTex = new THREE.CanvasTexture(_vrInfoCanvas);
+const _vrInfoMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.48, 0.15),
+  new THREE.MeshBasicMaterial({map: _vrInfoTex, transparent: true, depthTest: false, depthWrite: false, side: THREE.FrontSide})
+);
+_vrInfoMesh.position.set(0, -0.06, -0.55);
+_vrInfoMesh.renderOrder = 10000;
+_vrInfoMesh.visible = false;
+camera.add(_vrInfoMesh);
+
+function _vrSetInfo(line1, line2) {
+  var ctx = _vrInfoCtx, W = 512, H = 160;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(15, 20, 35, 0.95)';
+  ctx.beginPath();
+  try { ctx.roundRect(6, 6, W-12, H-12, 18); } catch(e) { ctx.rect(6, 6, W-12, H-12); }
+  ctx.fill();
+  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  try { ctx.roundRect(6, 6, W-12, H-12, 18); } catch(e) { ctx.rect(6, 6, W-12, H-12); }
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 40px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(line1 || '', W/2, line2 ? 54 : H/2);
+  if (line2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '30px Arial';
+    ctx.fillText(line2, W/2, 110);
+  }
+  _vrInfoTex.needsUpdate = true;
+  _vrInfoMesh.visible = true;
+}
+function _vrClearInfo() { _vrInfoMesh.visible = false; }
+
 const BOAT_FLOOR_Y = 35.0;
 const CLASSROOM_FLOOR_Y = 1.7;
 const BOAT_EYE_HEIGHT      = 6; // 4.42 * 2
@@ -355,8 +392,8 @@ function loadClassroomAssets(onComplete, onProgress) {
       classroomReady = true;
       classroomLoading = false;
       // Pre-warm: compile shaders + upload textures before scene switch
-      // VR: pre-warm 블로킹 전 fade 확실히 켬
-      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 0; }
+      // VR: pre-warm 블로킹 전 fade 확실히 켬 + UI 업데이트
+      if (renderer.xr.isPresenting) { vrFadePlane.visible = true; _vrFadeFrames = 0; _vrSetInfo('GPU 준비 중...', '약 1~2초 소요됩니다'); }
       classroomGroup.visible = true;
       renderer.compile(scene, camera);
       classroomGroup.traverse(function(n) {
@@ -1189,10 +1226,11 @@ function switchScene(to) {
   orbit.enabled = false;
   clickHintEl.style.display = 'none';
 
-  // VR: 클릭 즉시 블랙아웃 (로딩/pre-warm 전에 XR compositor가 검은 프레임 캐시)
+  // VR: 클릭 즉시 블랙아웃 + 3D 로딩 UI 표시
   if (renderer.xr.isPresenting) {
     vrFadePlane.visible = true;
-    _vrFadeFrames = 0; // 아직 카운트다운 시작 안 함 (씬 준비 후 시작)
+    _vrFadeFrames = 0;
+    _vrSetInfo('씬 전환 중...', to === 'classroom' ? '요트 내부로 이동합니다' : '요트 외부로 이동합니다');
   }
 
   transitionEl.classList.add('active');
@@ -1202,7 +1240,7 @@ function switchScene(to) {
     }
     loadClassroomAssets(() => {
       // VR: 이미 블랙아웃 중; 씬 전환 후 카운트다운 시작
-      if (renderer.xr.isPresenting) { _vrFadeFrames = 150; }
+      if (renderer.xr.isPresenting) { _vrSetInfo('진입 중...', '잠시만 기다려 주세요'); _vrFadeFrames = 150; }
       boatGroup.visible      = false;
       classroomGroup.visible = true;
       if (arrowGroup) arrowGroup.visible = false;
@@ -1227,7 +1265,10 @@ function switchScene(to) {
           _boatEntryPopupTimer = setTimeout(function() { boatEntryPopupEl.style.display = 'none'; }, 4000);
         }
       }, 320);
-    }, (pct) => { transitionBar.style.width = pct + '%'; transitionPct.textContent = pct + '%'; });
+    }, (pct) => {
+      transitionBar.style.width = pct + '%'; transitionPct.textContent = pct + '%';
+      if (renderer.xr.isPresenting) _vrSetInfo('로딩 중...', pct + '%  (' + pct + '/100)');
+    });
   } else {
     setTimeout(() => {
       // VR: 이미 블랙아웃 중; boat warm-up 후 카운트다운
@@ -1235,6 +1276,7 @@ function switchScene(to) {
         classroomGroup.visible = false;
         boatGroup.visible = true;
         renderer.compile(scene, camera); // boat 쉐이더 재확인
+        _vrSetInfo('이동 완료', '잠시 후 요트가 나타납니다');
         _vrFadeFrames = 150;
       } else {
         classroomGroup.visible = false;
@@ -1444,7 +1486,7 @@ function animate() {
     console.error('animate error:', e);
   }
 
-  if (_vrFadeFrames > 0) { _vrFadeFrames--; if (_vrFadeFrames === 0) vrFadePlane.visible = false; }
+  if (_vrFadeFrames > 0) { _vrFadeFrames--; if (_vrFadeFrames === 0) { vrFadePlane.visible = false; _vrClearInfo(); } }
   const p = playerRig.position;
   coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
   if (currentScene==='boat' && arrowGroup) {    _arrowTime += delta * 2.5;    var _camFwd = new THREE.Vector3();    camera.getWorldDirection(_camFwd);    _camFwd.y = 0; _camFwd.normalize();    arrowGroup.position.copy(playerRig.position);    arrowGroup.position.y = playerRig.position.y - 1.0;    arrowGroup.position.addScaledVector(_camFwd, 2.5);    arrowGroup.position.y += Math.sin(_arrowTime) * 0.12;    var _px = arrowGroup.position.x, _pz = arrowGroup.position.z;    var _toPortal = new THREE.Vector3(-0.03 - _px, 0, -37.47 - _pz);    arrowGroup.rotation.y = Math.atan2(_toPortal.x, _toPortal.z);    if (boatEntryPopupEl && boatEntryPopupEl.style.display === 'flex') {      var _wp = arrowGroup.position.clone(); _wp.project(camera);      if (_wp.z < 1) {        boatEntryPopupEl.style.left = ((_wp.x * 0.5 + 0.5) * window.innerWidth) + 'px';        boatEntryPopupEl.style.top = ((1 - (_wp.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';      }    }  }
