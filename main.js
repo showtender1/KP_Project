@@ -48,12 +48,24 @@ composer.addPass(new OutputPass());
 // VR 세션 시작: 그림자 끄기 + 포인터락 해제 + 클릭힌트 숨기기
 renderer.xr.addEventListener('sessionstart', () => {
   renderer.shadowMap.enabled = false;
+  // VR 조명 교체 + 셰이더 사전 컴파일 (블랙 fade 뒤에서 진행)
+  vrFadePlane.visible = true; _vrFadeFrames = 0;
+  _vrSetInfo('VR 초기화 중...', '셰이더 컴파일 중...');
+  _enableVRLights();
+  renderer.compileAsync(scene, camera).then(function() {
+    _vrSetInfo('준비 완료!', '씬이 곧 나타납니다');
+    _vrFadeFrames = 60;
+  });
+  renderer.xr.setFoveation(1.0);
   if (fps.isLocked) fps.unlock();
   clickHintEl.style.display = 'none';
 });
 // VR 세션 종료: 그림자 복원 + 클릭힌트 표시
 renderer.xr.addEventListener('sessionend', () => {
   renderer.shadowMap.enabled = true;
+  _disableVRLights();
+  renderer.shadowMap.needsUpdate = true;
+  renderer.xr.setFoveation(0.0);
   if (!transitioning) clickHintEl.style.display = 'flex';
 });
 
@@ -138,6 +150,23 @@ roomLight8.shadow.bias = -0.003;
 scene.add(roomLight8);
 scene.add(roomLight8.target);
 
+// VR 전용 조명 (8개 SpotLight → 1 HemiLight + 1 DirLight)
+// SpotLight는 per-fragment마다 atan2/sqrt/dot 연산 → Quest GPU 예산 초과
+const _vrHemiLight = new THREE.HemisphereLight(0xfff5e0, 0x9090a0, 2.5);
+const _vrDirLight  = new THREE.DirectionalLight(0xfffaed, 1.2);
+_vrDirLight.position.set(0.5, 1.0, 0.3).normalize();
+const _vrRoomLights = [roomLight1,roomLight2,roomLight3,roomLight4,roomLight5,
+                       roomLight6,roomLight7,roomLight8];
+function _enableVRLights() {
+  _vrRoomLights.forEach(function(l) { l.visible = false; });
+  if (!scene.children.includes(_vrHemiLight)) scene.add(_vrHemiLight);
+  if (!scene.children.includes(_vrDirLight))  scene.add(_vrDirLight);
+}
+function _disableVRLights() {
+  scene.remove(_vrHemiLight);
+  scene.remove(_vrDirLight);
+  _vrRoomLights.forEach(function(l) { l.visible = true; });
+}
 
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.enabled = false;
@@ -306,6 +335,7 @@ let _hoverTick = 0;
 let _shadowMoveTick = 0;
 let _coordsTick = 0;
 let _portalRayTick = 0;
+let _vrPhysTick = 0;
 let _hoverTargets = [];
 const _camFwdVec   = new THREE.Vector3();
 const _toPortalVec = new THREE.Vector3();
@@ -430,6 +460,10 @@ function loadClassroomAssets(onComplete, onProgress) {
         });
       } else {
         renderer.compile(scene, camera);
+        // VR 셰이더 변형 사전 컴파일 (조명 수/종류 바뀌면 재컴파일 발생 방지)
+        _enableVRLights();
+        renderer.compile(scene, camera);
+        _disableVRLights();
         _finalizePrewarm();
       }
     }
@@ -1312,6 +1346,7 @@ function switchScene(to) {
       if (renderer.xr.isPresenting) {
         classroomGroup.visible = false;
         boatGroup.visible = true;
+        _enableVRLights();
         _vrSetInfo('쉐이더 준비 중...', '잠시만 기다려 주세요');
         renderer.compileAsync(scene, camera).then(function() {
           _vrSetInfo('이동 완료!', '요트가 곧 나타납니다');
@@ -1530,7 +1565,11 @@ function animate() {
   if (++_coordsTick % 6 === 0) coordsEl.textContent = `X: ${p.x.toFixed(2)}  Y: ${p.y.toFixed(2)}  Z: ${p.z.toFixed(2)}`;
   if (currentScene==='boat' && arrowGroup) {    _arrowTime += delta * 2.5;    camera.getWorldDirection(_camFwdVec);    _camFwdVec.y = 0; _camFwdVec.normalize();    arrowGroup.position.copy(playerRig.position);    arrowGroup.position.y = playerRig.position.y - 1.0;    arrowGroup.position.addScaledVector(_camFwdVec, 2.5);    arrowGroup.position.y += Math.sin(_arrowTime) * 0.12;    var _px = arrowGroup.position.x, _pz = arrowGroup.position.z;    _toPortalVec.set(-0.03 - _px, 0, -37.47 - _pz);    arrowGroup.rotation.y = Math.atan2(_toPortalVec.x, _toPortalVec.z);    if (boatEntryPopupEl && boatEntryPopupEl.style.display === 'flex') {      _arrowWpVec.copy(arrowGroup.position); _arrowWpVec.project(camera);      if (_arrowWpVec.z < 1) {        boatEntryPopupEl.style.left = ((_arrowWpVec.x * 0.5 + 0.5) * window.innerWidth) + 'px';        boatEntryPopupEl.style.top = ((1 - (_arrowWpVec.y * 0.5 + 0.5)) * window.innerHeight - 70) + 'px';      }    }  }
 
-  if (currentScene === 'classroom') { updatePhysics(delta); _dartUpdate(delta); _dartUpdateArc(); }
+  if (currentScene === 'classroom') {
+    if (!renderer.xr.isPresenting || ++_vrPhysTick%2===0) updatePhysics(delta);
+    _dartUpdate(delta);
+    if (!renderer.xr.isPresenting) _dartUpdateArc();
+  }
 
   const doorAlpha = 1 - Math.exp(-10 * delta);
   for (const door of interactableDoors) {
